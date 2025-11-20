@@ -154,6 +154,16 @@ export class APCMiniMK2SceneMatrix extends APCMiniMK2Base {
     }
 
     /**
+     * 現在選択中のシーンの全パラメーター値を取得する。ランダムモードを自動でチェック。
+     */
+    public getParamValues(): number[] {
+        const currentScene = this.gridRadioState[this.currentSceneIndex];
+        return currentScene.map((param) =>
+            param.isRandom ? param.randomValue : param.selectedRow
+        );
+    }
+
+    /**
      * 全シーンのmaxOptionsをデフォルト値 (1) にリセットする。
      */
     public resetAllMaxOptions(): void {

@@ -26,6 +26,16 @@ export class TexManager {
     // init はキャンバスサイズに合わせた描画用 Graphics を初期化する。
     init(p: p5): void {
         this.renderTexture = p.createGraphics(p.width, p.height);
+
+        this.sceneMatrix.setMaxOptionsForScene(0, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(1, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(2, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(3, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(4, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(5, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(6, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(7, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(8, [2, 2, 2, 2, 2, 2, 2, 2]);
     }
 
     // getTexture は初期化済みの描画バッファを返し、未初期化時はエラーとする。
@@ -63,8 +73,8 @@ export class TexManager {
         texture.push();
         texture.clear();
 
-        this.bandManager.update(p);
-        this.bandManager.draw(p, texture, this.bpmManager.getBeat());
+        this.bandManager.update(p, this.bpmManager.getBeat(), this.sceneMatrix.getParamValues());
+        this.bandManager.draw(p, texture);
         texture.pop();
 
         this.sceneMatrix.drawDebug(p, texture, 24, 24);
