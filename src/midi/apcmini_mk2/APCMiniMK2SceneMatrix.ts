@@ -9,6 +9,7 @@ import {
     MIDI_STATUS,
     NOTE_RANGES,
 } from "./APCMiniMK2PatternTemplate";
+import type { MidiMessageLike } from "../MidiTypes";
 
 const SPECIAL_NOTES = {
     SHIFT: 122, // APC Mini MK2 Shift button (Note 122).
@@ -107,6 +108,10 @@ export class APCMiniMK2SceneMatrix extends APCMiniMK2Base {
         this.gridRadioState = this.createInitialGridState();
 
         this.sideButtonToggleState[this.currentSceneIndex] = 1;
+    }
+
+    protected shouldUseVirtualInput(): boolean {
+        return true;
     }
 
     // isRandomSceneModeActive はランダムシーンモードの有効状態を返す。
@@ -215,7 +220,7 @@ export class APCMiniMK2SceneMatrix extends APCMiniMK2Base {
     /**
      * MIDIメッセージ受信時の処理 (入力)
      */
-    protected handleMIDIMessage(message: WebMidi.MIDIMessageEvent): void {
+    protected handleMIDIMessage(message: MidiMessageLike): void {
         const [status, data1, data2] = message.data;
 
         if (status === MIDI_STATUS.CONTROL_CHANGE) {

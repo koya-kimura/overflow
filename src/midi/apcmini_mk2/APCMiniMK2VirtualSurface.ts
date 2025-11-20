@@ -4,17 +4,36 @@ import styleSheet from "./APCMiniMK2VirtualSurface.css?inline";
 const SIDE_BUTTON_COUNT = GRID_ROWS;
 const FADER_COUNT = GRID_COLS + 1;
 
+export interface APCMiniMK2VirtualRefs {
+    root: HTMLElement;
+    gridPads: HTMLButtonElement[];
+    sideButtons: HTMLButtonElement[];
+    faderButtons: HTMLButtonElement[];
+    faderSliders: HTMLInputElement[];
+}
+
 export class APCMiniMK2VirtualSurface {
     private root: HTMLElement | null = null;
     private pendingVisible = false;
+    private pendingInteractive = false;
     private readonly handleDomReady: () => void;
     private stylesReady = false;
+
+    private gridPads: HTMLButtonElement[] = [];
+    private sideButtons: HTMLButtonElement[] = [];
+    private faderButtons: HTMLButtonElement[] = [];
+    private faderSliders: HTMLInputElement[] = [];
+    private readyCallbacks: Array<(refs: APCMiniMK2VirtualRefs) => void> = [];
 
     constructor() {
         this.handleDomReady = () => {
             this.ensureStyles();
             this.root = this.buildSurface();
-            this.applyVisibility(this.pendingVisible);
+            if (this.root) {
+                this.applyVisibility(this.pendingVisible);
+                this.applyInteractive(this.pendingInteractive);
+                this.notifyReady();
+            }
         };
 
         if (typeof document === "undefined") {
@@ -33,12 +52,32 @@ export class APCMiniMK2VirtualSurface {
         this.applyVisibility(visible);
     }
 
+    public setInteractive(interactive: boolean): void {
+        this.pendingInteractive = interactive;
+        this.applyInteractive(interactive);
+    }
+
+    public onReady(callback: (refs: APCMiniMK2VirtualRefs) => void): void {
+        if (this.root) {
+            callback(this.cloneRefs());
+            return;
+        }
+        this.readyCallbacks.push(callback);
+    }
+
     private applyVisibility(visible: boolean): void {
         if (!this.root) {
             return;
         }
         this.root.dataset.visible = visible ? "true" : "false";
         this.root.setAttribute("aria-hidden", visible ? "false" : "true");
+    }
+
+    private applyInteractive(interactive: boolean): void {
+        if (!this.root) {
+            return;
+        }
+        this.root.dataset.interactive = interactive ? "true" : "false";
     }
 
     private buildSurface(): HTMLElement | null {
@@ -50,12 +89,16 @@ export class APCMiniMK2VirtualSurface {
 
         const existing = host.querySelector<HTMLElement>(".apcmini-virtual");
         if (existing) {
+            this.cacheElementsFromExisting(existing);
             return existing;
         }
+
+        this.resetElementCaches();
 
         const container = document.createElement("div");
         container.className = "apcmini-virtual";
         container.dataset.visible = "false";
+        container.dataset.interactive = "false";
         container.setAttribute("aria-hidden", "true");
 
         const headline = document.createElement("div");
@@ -115,15 +158,17 @@ export class APCMiniMK2VirtualSurface {
     }
 
     private populateGridPads(target: HTMLElement): void {
-        for (let row = GRID_ROWS - 1; row >= 0; row--) {
+        for (let rowFromTop = 0; rowFromTop < GRID_ROWS; rowFromTop++) {
+            const bottomRow = GRID_ROWS - 1 - rowFromTop;
             for (let col = 0; col < GRID_COLS; col++) {
                 const pad = document.createElement("button");
                 pad.type = "button";
                 pad.className = "apcmini-virtual__pad";
-                pad.textContent = `${col + 1}-${GRID_ROWS - row}`;
+                pad.textContent = `${col + 1}-${bottomRow + 1}`;
                 pad.dataset.column = String(col);
-                pad.dataset.row = String(row);
+                pad.dataset.row = String(bottomRow);
                 target.appendChild(pad);
+                this.gridPads.push(pad);
             }
         }
     }
@@ -136,6 +181,7 @@ export class APCMiniMK2VirtualSurface {
             button.textContent = `S${index + 1}`;
             button.dataset.index = String(index);
             target.appendChild(button);
+            this.sideButtons.push(button);
         }
     }
 
@@ -150,16 +196,59 @@ export class APCMiniMK2VirtualSurface {
             button.textContent = index === FADER_COUNT - 1 ? "Master" : `F${index + 1}`;
             button.dataset.index = String(index);
             column.appendChild(button);
+            this.faderButtons.push(button);
 
             const slider = document.createElement("input");
             slider.type = "range";
             slider.min = "0";
             slider.max = "127";
             slider.value = "0";
+            slider.dataset.index = String(index);
             slider.setAttribute("aria-label", `Fader ${index + 1}`);
             column.appendChild(slider);
+            this.faderSliders.push(slider);
 
             target.appendChild(column);
         }
+    }
+
+    private cacheElementsFromExisting(root: HTMLElement): void {
+        this.gridPads = Array.from(root.querySelectorAll<HTMLButtonElement>(".apcmini-virtual__pad"));
+        this.sideButtons = Array.from(root.querySelectorAll<HTMLButtonElement>(".apcmini-virtual__side-button"));
+        this.faderButtons = Array.from(root.querySelectorAll<HTMLButtonElement>(".apcmini-virtual__fader-button"));
+        this.faderSliders = Array.from(root.querySelectorAll<HTMLInputElement>(".apcmini-virtual__fader input[type=\"range\"]"));
+    }
+
+    private resetElementCaches(): void {
+        this.gridPads = [];
+        this.sideButtons = [];
+        this.faderButtons = [];
+        this.faderSliders = [];
+    }
+
+    private notifyReady(): void {
+        if (!this.root) {
+            return;
+        }
+
+        if (this.readyCallbacks.length > 0) {
+            const callbacks = [...this.readyCallbacks];
+            this.readyCallbacks = [];
+            callbacks.forEach((callback) => callback(this.cloneRefs()));
+        }
+    }
+
+    private cloneRefs(): APCMiniMK2VirtualRefs {
+        if (!this.root) {
+            throw new Error("Virtual surface root is not ready.");
+        }
+
+        return {
+            root: this.root,
+            gridPads: [...this.gridPads],
+            sideButtons: [...this.sideButtons],
+            faderButtons: [...this.faderButtons],
+            faderSliders: [...this.faderSliders],
+        };
     }
 }

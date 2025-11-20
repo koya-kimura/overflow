@@ -9,6 +9,7 @@ import {
     MIDI_STATUS,
     NOTE_RANGES,
 } from "./APCMiniMK2PatternTemplate";
+import type { MidiMessageLike } from "../MidiTypes";
 
 type GridStateType = "INACTIVE" | "TOGGLED" | "ONESHOT" | "PRESSED" | "LEAP";
 type GridStateMode = "SET" | "GET";
@@ -101,7 +102,7 @@ export class APCMiniMK2LerpSurface extends APCMiniMK2Base {
     }
 
     // handleMIDIMessage は補間サーフェス向けの MIDI 入力を処理する。
-    protected handleMIDIMessage(message: WebMidi.MIDIMessageEvent): void {
+    protected handleMIDIMessage(message: MidiMessageLike): void {
         const [status, data1, data2 = 0] = message.data;
 
         if (status === MIDI_STATUS.CONTROL_CHANGE) {

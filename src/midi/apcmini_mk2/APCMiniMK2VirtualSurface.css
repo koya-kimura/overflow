@@ -14,6 +14,19 @@
   display: block;
 }
 
+.apcmini-virtual[data-interactive="false"] {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.apcmini-virtual[data-interactive="false"] button {
+  cursor: default;
+}
+
+.apcmini-virtual[data-interactive="false"] input[type="range"] {
+  pointer-events: none;
+}
+
 .apcmini-virtual__headline {
   display: flex;
   justify-content: space-between;

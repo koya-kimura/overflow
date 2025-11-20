@@ -6,5 +6,5 @@ export interface Scene {
     update(p: p5): void;
 
     // draw はシーンの視覚表現を受け取った Graphics に描画する。
-    draw(p: p5, tex: p5.Graphics): void;
+    draw(p: p5, tex: p5.Graphics, beat: number): void;
 }

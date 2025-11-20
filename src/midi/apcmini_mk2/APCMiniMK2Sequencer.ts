@@ -9,6 +9,7 @@ import {
     MIDI_STATUS,
     NOTE_RANGES,
 } from "./APCMiniMK2PatternTemplate";
+import type { MidiMessageLike } from "../MidiTypes";
 
 const APC_COLORS = {
     OFF: 0,
@@ -109,7 +110,7 @@ export class APCMiniMK2StepSequencer extends APCMiniMK2Base {
     }
 
     // handleMIDIMessage はシーケンサー用の入力を解釈する。
-    protected handleMIDIMessage(message: WebMidi.MIDIMessageEvent): void {
+    protected handleMIDIMessage(message: MidiMessageLike): void {
         const [status, data1, data2 = 0] = message.data;
 
         if (status === MIDI_STATUS.CONTROL_CHANGE) {

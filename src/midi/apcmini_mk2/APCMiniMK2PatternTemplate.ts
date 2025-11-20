@@ -1,7 +1,9 @@
 // APCMiniMK2PatternTemplate は APC Mini MK2 系クラスの共通基盤を提供する。
 
+import type { MidiMessageLike } from "../MidiTypes";
 import { MIDIManager } from "../midiManager";
 import { APCMiniMK2VirtualSurface } from "./APCMiniMK2VirtualSurface";
+import { APCMiniMK2VirtualInput } from "./APCMiniMK2VirtualInput";
 import { GRID_COLS, GRID_ROWS, NOTE_RANGES } from "./APCMiniMK2Constants";
 export {
     GRID_COLS,
@@ -29,18 +31,38 @@ export interface GridCoordinate {
  * 最低限 {@link handleMIDIMessage} を実装し、必要に応じて update ループや補助メソッドを用意してください。
  */
 export abstract class APCMiniMK2Base extends MIDIManager {
-    private readonly virtualSurface: APCMiniMK2VirtualSurface;
+    private readonly usesVirtualInput: boolean;
+    private readonly virtualSurface: APCMiniMK2VirtualSurface | null;
+    private readonly virtualInput: APCMiniMK2VirtualInput | null;
     // constructor は MIDI コールバックを必要に応じて自動紐付けする。
     protected constructor(autoBindCallback = true) {
         super();
-        this.virtualSurface = new APCMiniMK2VirtualSurface();
+        this.usesVirtualInput = this.shouldUseVirtualInput();
+
+        if (this.usesVirtualInput) {
+            const surface = new APCMiniMK2VirtualSurface();
+            this.virtualSurface = surface;
+            const input = new APCMiniMK2VirtualInput(surface);
+            input.setMessageEmitter((data: number[]) => {
+                this.dispatchVirtualMidiMessage(data);
+            });
+            this.virtualInput = input;
+        } else {
+            this.virtualSurface = null;
+            this.virtualInput = null;
+        }
         if (autoBindCallback) {
             this.onMidiMessageCallback = this.handleMIDIMessage.bind(this);
         }
     }
 
     // handleMIDIMessage は派生クラスが実装すべき必須コールバック。
-    protected abstract handleMIDIMessage(message: WebMidi.MIDIMessageEvent): void;
+    protected abstract handleMIDIMessage(message: MidiMessageLike): void;
+
+    // サブクラスが仮想入力を必要とする場合に true を返す。
+    protected shouldUseVirtualInput(): boolean {
+        return false;
+    }
 
     // isGridPad はノート番号がメイングリッドかを判定する。
     protected isGridPad(note: number): boolean {
@@ -94,7 +116,34 @@ export abstract class APCMiniMK2Base extends MIDIManager {
 
     protected onMidiAvailabilityChanged(available: boolean): void {
         super.onMidiAvailabilityChanged(available);
-        this.virtualSurface.setVisible(!available);
+        if (!this.usesVirtualInput || !this.virtualSurface || !this.virtualInput) {
+            return;
+        }
+
+        const useVirtual = !available;
+        this.virtualSurface.setVisible(useVirtual);
+        this.virtualInput.setActive(useVirtual);
+    }
+
+    protected getVirtualSurface(): APCMiniMK2VirtualSurface | null {
+        return this.virtualSurface;
+    }
+
+    private dispatchVirtualMidiMessage(data: number[]): void {
+        if (!this.usesVirtualInput) {
+            return;
+        }
+        const message: MidiMessageLike = {
+            data: new Uint8Array(data),
+        };
+
+        const callback = this.onMidiMessageCallback;
+        if (callback) {
+            callback(message);
+            return;
+        }
+
+        this.handleMIDIMessage(message);
     }
 
     // clamp01 は 0〜1 の範囲に値を収める。
@@ -147,7 +196,7 @@ export class APCMiniMK2PatternTemplate extends APCMiniMK2Base {
     }
 
     // handleMIDIMessage はテンプレートとして空実装を提供する。
-    protected handleMIDIMessage(_message: WebMidi.MIDIMessageEvent): void {
+    protected handleMIDIMessage(_message: MidiMessageLike): void {
         // TODO: MIDI入力に応じた処理を実装してください。
     }
 }

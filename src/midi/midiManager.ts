@@ -1,5 +1,7 @@
 // src/midi/midiManager.ts
 
+import type { MidiMessageLike } from "./MidiTypes";
+
 /**
  * MIDIデバイスの管理を行うクラス
  * MIDIの入出力の初期化、メッセージの処理を担当します。
@@ -10,7 +12,7 @@ export class MIDIManager {
     private readonly MIDI_ACCESS_DELAY: number = 1000; // 1秒の遅延
 
     // MIDIメッセージ受信時に実行されるコールバック関数
-    public onMidiMessageCallback: ((message: WebMidi.MIDIMessageEvent) => void) | null = null;
+    public onMidiMessageCallback: ((message: MidiMessageLike) => void) | null = null;
 
     /**
      * コンストラクタ

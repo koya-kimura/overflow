@@ -5,7 +5,6 @@ import { bandManager } from "../scenes/bandManager";
 import { APCMiniMK2ToggleMatrix } from "../midi/apcmini_mk2/APCMiniMK2ToggleMatrix";
 // import type { Scene } from "../scenes/Scene";
 import { APCMiniMK2SceneMatrix } from "../midi/apcmini_mk2/APCMiniMK2SceneMatrix";
-import { SampleScene } from "../scenes/sampleScene";
 
 // TexManager は描画用の p5.Graphics とシーン、MIDI デバッグ描画のハブを担当する。
 export class TexManager {
@@ -65,8 +64,10 @@ export class TexManager {
         texture.clear();
 
         this.bandManager.update(p);
-        this.bandManager.draw(p, texture);
+        this.bandManager.draw(p, texture, this.bpmManager.getBeat());
         texture.pop();
+
+        this.sceneMatrix.drawDebug(p, texture, 24, 24);
     }
 
     keyPressed(keyCode: number): void {

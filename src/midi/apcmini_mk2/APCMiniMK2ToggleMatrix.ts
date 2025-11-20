@@ -9,6 +9,7 @@ import {
     MIDI_STATUS,
     NOTE_RANGES,
 } from "./APCMiniMK2PatternTemplate";
+import type { MidiMessageLike } from "../MidiTypes";
 
 const LED_COLOR = {
     OFF: 0,
@@ -60,7 +61,7 @@ export class APCMiniMK2ToggleMatrix extends APCMiniMK2Base {
     }
 
     // handleMIDIMessage はトグル操作やフェーダー入力を処理する。
-    protected handleMIDIMessage(message: WebMidi.MIDIMessageEvent): void {
+    protected handleMIDIMessage(message: MidiMessageLike): void {
         const [status, data1, data2 = 0] = message.data;
 
         if (status === MIDI_STATUS.CONTROL_CHANGE) {
