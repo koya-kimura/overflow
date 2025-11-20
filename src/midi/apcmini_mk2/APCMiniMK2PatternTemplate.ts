@@ -4,7 +4,13 @@ import type { MidiMessageLike } from "../MidiTypes";
 import { MIDIManager } from "../midiManager";
 import { APCMiniMK2VirtualSurface } from "./APCMiniMK2VirtualSurface";
 import { APCMiniMK2VirtualInput } from "./APCMiniMK2VirtualInput";
-import { GRID_COLS, GRID_ROWS, NOTE_RANGES } from "./APCMiniMK2Constants";
+import {
+    GRID_COLS,
+    GRID_ROWS,
+    MIDI_OUTPUT_STATUS,
+    MIDI_STATUS,
+    NOTE_RANGES,
+} from "./APCMiniMK2Constants";
 export {
     GRID_COLS,
     GRID_ROWS,
@@ -52,7 +58,10 @@ export abstract class APCMiniMK2Base extends MIDIManager {
             this.virtualInput = null;
         }
         if (autoBindCallback) {
-            this.onMidiMessageCallback = this.handleMIDIMessage.bind(this);
+            this.onMidiMessageCallback = (message) => {
+                this.reflectIncomingForVirtual(message);
+                this.handleMIDIMessage(message);
+            };
         }
     }
 
@@ -125,6 +134,22 @@ export abstract class APCMiniMK2Base extends MIDIManager {
         this.virtualInput.setActive(useVirtual);
     }
 
+    public override sendMessage(message: number[]): void {
+        super.sendMessage(message);
+        if (!this.usesVirtualInput || !this.virtualSurface || message.length === 0) {
+            return;
+        }
+
+        const [status, data1, data2 = 0] = message;
+        if (status === MIDI_STATUS.NOTE_ON || status === MIDI_OUTPUT_STATUS.NOTE_ON) {
+            this.virtualSurface.applyNoteOutput(status, data1, data2);
+        } else if (status === MIDI_STATUS.NOTE_OFF) {
+            this.virtualSurface.applyNoteOutput(status, data1, 0);
+        } else if (status === MIDI_STATUS.CONTROL_CHANGE) {
+            this.virtualSurface.applyControlChange(data1, data2);
+        }
+    }
+
     protected getVirtualSurface(): APCMiniMK2VirtualSurface | null {
         return this.virtualSurface;
     }
@@ -143,7 +168,34 @@ export abstract class APCMiniMK2Base extends MIDIManager {
             return;
         }
 
+        this.reflectIncomingForVirtual(message);
         this.handleMIDIMessage(message);
+    }
+
+    private reflectIncomingForVirtual(message: MidiMessageLike): void {
+        if (!this.usesVirtualInput || !this.virtualSurface) {
+            return;
+        }
+
+        const data = message.data;
+        if (!data || data.length < 2) {
+            return;
+        }
+
+        const [status, data1, data2 = 0] = data;
+        if (status === MIDI_STATUS.CONTROL_CHANGE) {
+            this.virtualSurface.applyControlChange(data1, data2);
+            return;
+        }
+
+        if (status === MIDI_STATUS.NOTE_ON || status === MIDI_OUTPUT_STATUS.NOTE_ON) {
+            this.virtualSurface.applyNoteOutput(status, data1, data2);
+            return;
+        }
+
+        if (status === MIDI_STATUS.NOTE_OFF) {
+            this.virtualSurface.applyNoteOutput(status, data1, 0);
+        }
     }
 
     // clamp01 は 0〜1 の範囲に値を収める。

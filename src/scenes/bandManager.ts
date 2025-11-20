@@ -1,6 +1,7 @@
 import p5 from "p5";
 import type { Scene } from "./Scene";
 import { ColorPalette } from "../utils/colorPalette";
+import { Easing } from "../utils/easing";
 
 type BoxCoordinates = {
     topX1: number;
@@ -19,13 +20,28 @@ export class bandManager implements Scene {
 
     // draw は受け取った Graphics にシーンのビジュアルを描画する。
     draw(_p: p5, tex: p5.Graphics, beat: number): void {
-        
+        const bandWidthScale = 0.8 + 0.2 * Easing.easeInOutQuad(Math.abs(beat % 2 - 1));
+        const bandHeightScale = 0.8 + 0.2 * Easing.easeInOutQuad(Math.abs(beat % 2 - 1));
+
+        const topCeneterScaleX = Math.sin(beat * 0.5 * Math.PI) * 0.5 + 0.5;
+        const topWidthScaleX = 0.5;
+
+        const topLeftScaleX = topCeneterScaleX - topWidthScaleX * 0.5;
+        const topRightScaleX = topCeneterScaleX + topWidthScaleX * 0.5;
+
+        const bottomCenterScaleX = Math.cos(beat * 0.5 * Math.PI) * 0.5 + 0.5;
+        const bottomWidthScaleX = 0.5;
+
+        const bottomLeftScaleX = bottomCenterScaleX - bottomWidthScaleX * 0.5;
+        const bottomRightScaleX = bottomCenterScaleX + bottomWidthScaleX * 0.5;
+
+
         for (let i = 0; i < 5; i++) {
             tex.noStroke();
 
-            const segmentData = this.calculateSegmentData(_p, 5, i, i, i+1, i+1, 0.1, 0, 1, 0, 1);
+            const segmentData = this.calculateSegmentData(_p, 5, i, i, i, i, bandWidthScale, topLeftScaleX, topRightScaleX, bottomLeftScaleX, bottomRightScaleX);
             tex.fill(ColorPalette.colors[i % ColorPalette.colors.length]);
-            this.drawBand(_p, tex, segmentData);
+            this.drawBand(_p, tex, segmentData, 0.5 - bandHeightScale * 0.5, 0.5 + bandHeightScale * 0.5);
         }
     }
 

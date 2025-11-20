@@ -399,7 +399,7 @@ export class APCMiniMK2SceneMatrix extends APCMiniMK2Base {
     private handleGridPadInput(note: number): void {
         const gridIndex = note - NOTE_RANGES.GRID.START;
         const columnIndex = gridIndex % GRID_COLS;
-        const rowIndex = GRID_ROWS - 1 - Math.floor(gridIndex / GRID_COLS);
+        const rowIndex = Math.floor(gridIndex / GRID_COLS);
         const param = this.gridRadioState[this.currentSceneIndex][columnIndex];
 
         if (rowIndex === GRID_ROWS - 1) {

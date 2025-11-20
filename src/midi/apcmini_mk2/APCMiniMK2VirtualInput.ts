@@ -139,6 +139,7 @@ export class APCMiniMK2VirtualInput {
         }
         const controller = NOTE_RANGES.FADERS.START + this.clamp(index, GRID_COLS + 1);
         const value = this.clamp(Math.round(Number(slider.value)), 128);
+        this.surface.applyControlChange(controller, value);
         this.emit([MIDI_STATUS.CONTROL_CHANGE, controller, value]);
     };
 
@@ -184,8 +185,7 @@ export class APCMiniMK2VirtualInput {
     private getGridNote(column: number, row: number): number {
         const clampedColumn = this.clamp(column, GRID_COLS);
         const clampedRow = this.clamp(row, GRID_ROWS);
-        const rowFromTop = GRID_ROWS - 1 - clampedRow;
-        const gridIndex = rowFromTop * GRID_COLS + clampedColumn;
+        const gridIndex = clampedRow * GRID_COLS + clampedColumn;
         return NOTE_RANGES.GRID.START + gridIndex;
     }
 

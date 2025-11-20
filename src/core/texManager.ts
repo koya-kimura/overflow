@@ -48,8 +48,8 @@ export class TexManager {
 
     // update はシーンの更新前に MIDI 状態を反映させる。
     update(_p: p5): void {
-        this.bpmManager.update();
-        this.sceneMatrix.update();
+        this.bpmManager.update()
+        this.sceneMatrix.update(Math.floor(this.bpmManager.getBeat()))
         this.midiFallback.update();
     }
 
