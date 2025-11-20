@@ -30,6 +30,8 @@ export class MIDIManager {
 
         if (!navigator.requestMIDIAccess) {
             console.error("Web MIDI API is not supported in this browser.");
+            this.midiSuccess = false;
+            this.onMidiAvailabilityChanged(false);
             return;
         }
 

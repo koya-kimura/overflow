@@ -1,28 +1,15 @@
 // APCMiniMK2PatternTemplate は APC Mini MK2 系クラスの共通基盤を提供する。
 
 import { MIDIManager } from "../midiManager";
-
-export const MIDI_STATUS = {
-    NOTE_ON: 0x90,
-    NOTE_OFF: 0x80,
-    CONTROL_CHANGE: 0xB0,
-} as const;
-
-export const MIDI_OUTPUT_STATUS = {
-    NOTE_ON: 0x96,
-    NOTE_OFF: 0x80,
-} as const;
-
-export const NOTE_RANGES = {
-    GRID: { START: 0, END: 63 },
-    FADER_BUTTONS: { START: 100, END: 107 },
-    SIDE_BUTTONS: { START: 112, END: 119 },
-    FADERS: { START: 48, END: 56 },
-    FADER_BUTTON_8: 122,
-} as const;
-
-export const GRID_ROWS = 8;
-export const GRID_COLS = 8;
+import { APCMiniMK2VirtualSurface } from "./APCMiniMK2VirtualSurface";
+import { GRID_COLS, GRID_ROWS, NOTE_RANGES } from "./APCMiniMK2Constants";
+export {
+    GRID_COLS,
+    GRID_ROWS,
+    MIDI_OUTPUT_STATUS,
+    MIDI_STATUS,
+    NOTE_RANGES,
+} from "./APCMiniMK2Constants";
 
 export interface GridCoordinate {
     column: number;
@@ -42,9 +29,11 @@ export interface GridCoordinate {
  * 最低限 {@link handleMIDIMessage} を実装し、必要に応じて update ループや補助メソッドを用意してください。
  */
 export abstract class APCMiniMK2Base extends MIDIManager {
+    private readonly virtualSurface: APCMiniMK2VirtualSurface;
     // constructor は MIDI コールバックを必要に応じて自動紐付けする。
     protected constructor(autoBindCallback = true) {
         super();
+        this.virtualSurface = new APCMiniMK2VirtualSurface();
         if (autoBindCallback) {
             this.onMidiMessageCallback = this.handleMIDIMessage.bind(this);
         }
@@ -101,6 +90,11 @@ export abstract class APCMiniMK2Base extends MIDIManager {
         const rowFromTop = GRID_ROWS - 1 - clampedRow;
         const gridIndex = rowFromTop * GRID_COLS + clampedColumn;
         return NOTE_RANGES.GRID.START + gridIndex;
+    }
+
+    protected onMidiAvailabilityChanged(available: boolean): void {
+        super.onMidiAvailabilityChanged(available);
+        this.virtualSurface.setVisible(!available);
     }
 
     // clamp01 は 0〜1 の範囲に値を収める。

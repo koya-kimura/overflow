@@ -1,21 +1,27 @@
 import p5 from "p5";
 
-import type { Scene } from "../scenes/Scene";
+import { BPMManager } from "../rhythm/BPMManager";
+import { bandManager } from "../scenes/bandManager";
+import { APCMiniMK2ToggleMatrix } from "../midi/apcmini_mk2/APCMiniMK2ToggleMatrix";
+// import type { Scene } from "../scenes/Scene";
 import { APCMiniMK2SceneMatrix } from "../midi/apcmini_mk2/APCMiniMK2SceneMatrix";
 import { SampleScene } from "../scenes/sampleScene";
 
 // TexManager は描画用の p5.Graphics とシーン、MIDI デバッグ描画のハブを担当する。
 export class TexManager {
     private renderTexture: p5.Graphics | null;
-    private readonly midiSceneMatrix: APCMiniMK2SceneMatrix;
-    private readonly scenes: Scene[];
-    private activeSceneIndex = 0;
+    private bpmManager: BPMManager;
+    private bandManager: bandManager;
+    private readonly midiFallback: APCMiniMK2ToggleMatrix;
+    private readonly sceneMatrix: APCMiniMK2SceneMatrix;
 
     // コンストラクタではデバッグ用シーン管理と MIDI ハンドラをセットアップする。
     constructor() {
         this.renderTexture = null;
-        this.midiSceneMatrix = new APCMiniMK2SceneMatrix();
-        this.scenes = [new SampleScene()];
+        this.bpmManager = new BPMManager();
+        this.bandManager = new bandManager();
+        this.midiFallback = new APCMiniMK2ToggleMatrix();
+        this.sceneMatrix = new APCMiniMK2SceneMatrix();
     }
 
     // init はキャンバスサイズに合わせた描画用 Graphics を初期化する。
@@ -42,10 +48,10 @@ export class TexManager {
     }
 
     // update はシーンの更新前に MIDI 状態を反映させる。
-    update(p: p5): void {
-        this.midiSceneMatrix.update();
-        const currentScene = this.scenes[this.activeSceneIndex];
-        currentScene.update(p);
+    update(_p: p5): void {
+        this.bpmManager.update();
+        this.sceneMatrix.update();
+        this.midiFallback.update();
     }
 
     // draw はシーン描画と MIDI デバッグオーバーレイを Graphics 上にまとめて描画する。
@@ -56,9 +62,16 @@ export class TexManager {
         }
 
         texture.push();
-        const currentScene = this.scenes[this.activeSceneIndex];
-        currentScene.draw(p, texture);
-        this.midiSceneMatrix.drawDebug(p, texture);
+        texture.clear();
+
+        this.bandManager.update(p);
+        this.bandManager.draw(p, texture);
         texture.pop();
+    }
+
+    keyPressed(keyCode: number): void {
+        if (keyCode == 13){
+            this.bpmManager.tapTempo();
+        }
     }
 }

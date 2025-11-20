@@ -11,7 +11,8 @@ const effectManager = new EffectManager();
 const sketch = (p: p5) => {
   // setup は一度だけ呼ばれ、レンダーターゲットとシェーダーを初期化する。
   p.setup = async () => {
-    p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
+    const canvas = p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
+    canvas.parent("canvas-container");
     texManager.init(p);
 
     await effectManager.load(
@@ -42,6 +43,7 @@ const sketch = (p: p5) => {
     if (p.keyCode === 32) {
       p.fullscreen(true);
     }
+    texManager.keyPressed(p.keyCode);
   };
 };
 

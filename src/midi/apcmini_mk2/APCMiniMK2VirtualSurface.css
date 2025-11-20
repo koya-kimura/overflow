@@ -1,0 +1,183 @@
+.apcmini-virtual {
+  display: none;
+  margin: 0 auto 48px auto;
+  padding: 24px;
+  width: min(960px, 92vw);
+  background-color: rgba(18, 18, 18, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.apcmini-virtual[data-visible="true"] {
+  display: block;
+}
+
+.apcmini-virtual__headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.apcmini-virtual__title {
+  margin: 0;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+}
+
+.apcmini-virtual__status {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(245, 245, 245, 0.72);
+}
+
+.apcmini-virtual__matrix {
+  display: grid;
+  grid-template-columns: auto 64px;
+  gap: 24px;
+}
+
+.apcmini-virtual__grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(40px, 1fr));
+  gap: 10px;
+}
+
+.apcmini-virtual__pad {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(32, 32, 32, 0.9), rgba(12, 12, 12, 0.9));
+  color: rgba(245, 245, 245, 0.8);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.apcmini-virtual__pad:hover,
+.apcmini-virtual__side-button:hover,
+.apcmini-virtual__fader-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.apcmini-virtual__side {
+  display: grid;
+  grid-template-rows: repeat(8, 1fr);
+  gap: 10px;
+  align-content: start;
+}
+
+.apcmini-virtual__side-button {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(160deg, rgba(26, 26, 26, 0.95), rgba(10, 10, 10, 0.85));
+  color: rgba(245, 245, 245, 0.88);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.apcmini-virtual__faders {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(54px, 1fr));
+  gap: 18px;
+}
+
+.apcmini-virtual__fader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.apcmini-virtual__fader input[type="range"] {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  width: 16px;
+  height: 160px;
+  padding: 0;
+  margin: 0 auto;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  transform-origin: 50% 50%;
+  border-radius: 12px;
+  background: rgba(40, 40, 40, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.apcmini-virtual__fader input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6cf5ff;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  box-shadow: 0 0 0 3px rgba(108, 245, 255, 0.2);
+  cursor: pointer;
+}
+
+.apcmini-virtual__fader input[type="range"]::-moz-range-track {
+  background: rgba(40, 40, 40, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.apcmini-virtual__fader input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6cf5ff;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  box-shadow: 0 0 0 3px rgba(108, 245, 255, 0.2);
+  cursor: pointer;
+}
+
+.apcmini-virtual__fader-button {
+  width: 80%;
+  max-width: 80px;
+  padding: 6px 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(160deg, rgba(32, 32, 32, 0.95), rgba(12, 12, 12, 0.9));
+  color: rgba(245, 245, 245, 0.88);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+@media (max-width: 720px) {
+  .apcmini-virtual {
+    padding: 20px;
+  }
+
+  .apcmini-virtual__matrix {
+    grid-template-columns: 1fr;
+  }
+
+  .apcmini-virtual__side {
+    grid-template-columns: repeat(4, minmax(48px, 1fr));
+    grid-template-rows: auto;
+    justify-items: stretch;
+  }
+
+  .apcmini-virtual__side-button {
+    height: 48px;
+  }
+
+  .apcmini-virtual__faders {
+    grid-template-columns: repeat(3, minmax(70px, 1fr));
+  }
+}
