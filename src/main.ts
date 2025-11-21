@@ -2,10 +2,14 @@
 import p5 from "p5";
 
 import { TexManager } from "./core/texManager";
+import { UIManager } from "./core/uiManager";
 import { EffectManager } from "./core/effectManager";
 
 const texManager = new TexManager();
+const uiManager = new UIManager();
 const effectManager = new EffectManager();
+
+let font: p5.Font;
 
 // sketch は p5 インスタンスモードで実行されるエントリー関数。
 const sketch = (p: p5) => {
@@ -14,7 +18,9 @@ const sketch = (p: p5) => {
     const canvas = p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
     canvas.parent("canvas-container");
     texManager.init(p);
+    uiManager.init(p);
 
+    font = await p.loadFont("/font/Jost-Regular.ttf");
     await effectManager.load(
       p,
       "/shader/post.vert",
@@ -29,13 +35,17 @@ const sketch = (p: p5) => {
     texManager.update(p);
     texManager.draw(p);
 
-    effectManager.apply(p, texManager.getTexture(), texManager.sceneMatrix.faderValues);
+    uiManager.update(p);
+    uiManager.draw(p, font);
+
+    effectManager.apply(p, texManager.getTexture(), uiManager.getTexture(), texManager.sceneMatrix.faderValues);
   };
 
   // windowResized はブラウザのリサイズに追従してバッファを更新する。
   p.windowResized = () => {
     p.resizeCanvas(p.windowWidth, p.windowHeight);
     texManager.resize(p);
+    uiManager.resize(p);
   };
 
   // keyPressed はスペースキーでフルスクリーンを切り替えるショートカットを提供。

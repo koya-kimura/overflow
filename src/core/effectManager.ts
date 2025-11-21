@@ -21,13 +21,14 @@ export class EffectManager {
     }
 
     // apply は保持しているシェーダーをアクティブにし、各種 Uniform を設定して描画する。
-    apply(p: p5, sourceTexture: p5.Graphics, faderValues: number[]): void {
+    apply(p: p5, sourceTexture: p5.Graphics, uiTexture: p5.Graphics, faderValues: number[]): void {
         if (!this.shader) {
             return;
         }
 
         p.shader(this.shader);
         this.shader.setUniform("u_tex", sourceTexture);
+        this.shader.setUniform("u_uiTex", uiTexture);
         this.shader.setUniform("u_resolution", [p.width, p.height]);
         this.shader.setUniform("u_time", p.millis() / 1000.0);
 

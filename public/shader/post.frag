@@ -5,6 +5,7 @@ varying vec2 vTexCoord;
 uniform float u_time;
 uniform vec2 u_resolution;
 uniform sampler2D u_tex;
+uniform sampler2D u_uiTex;
 
 uniform float u_mosaic;
 
@@ -59,6 +60,10 @@ void main(void) {
     uv = mosaic(uv, u_resolution, map(u_mosaic, 0., 1., 1000., 10.));
 
     vec4 col = texture2D(u_tex, uv);
+
+    vec4 uiCol = texture2D(u_uiTex, vTexCoord);
+
+    col.rgb += uiCol.rgb * uiCol.a;
 
     gl_FragColor = col;
 }
