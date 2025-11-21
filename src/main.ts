@@ -29,7 +29,7 @@ const sketch = (p: p5) => {
     texManager.update(p);
     texManager.draw(p);
 
-    effectManager.apply(p, texManager.getTexture());
+    effectManager.apply(p, texManager.getTexture(), texManager.sceneMatrix.faderValues);
   };
 
   // windowResized はブラウザのリサイズに追従してバッファを更新する。

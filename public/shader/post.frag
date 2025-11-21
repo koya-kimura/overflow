@@ -6,6 +6,8 @@ uniform float u_time;
 uniform vec2 u_resolution;
 uniform sampler2D u_tex;
 
+uniform float u_mosaic;
+
 float PI = 3.14159265358979;
 
 float random(vec2 st){
@@ -28,8 +30,8 @@ vec2 pol2xy(vec2 pol){
     return pol.y * vec2(cos(pol.x), sin(pol.x));
 }
 
-vec2 mosaic(vec2 uv, float n){
-    return vec2((floor(uv.x * n) + 0.5) / n, (floor(uv.y * n * 9. / 16.) + 0.5) / (n*9./16.));
+vec2 mosaic(vec2 uv, vec2 res, float n){
+    return vec2((floor(uv.x * n) + 0.5) / n, (floor(uv.y * n * res.y / res.x) + 0.5) / (n*res.y/res.x));
 }
 
 float gray (vec3 col){
@@ -47,8 +49,15 @@ vec3 hsv2rgb(in float h){
     return rgb;
 }
 
+float map(float value, float min1, float max1, float min2, float max2){
+    return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
+}
+
 void main(void) {
     vec2 uv = vTexCoord;
+
+    uv = mosaic(uv, u_resolution, map(u_mosaic, 0., 1., 1000., 10.));
+
     vec4 col = texture2D(u_tex, uv);
 
     gl_FragColor = col;

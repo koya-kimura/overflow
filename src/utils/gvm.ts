@@ -1,9 +1,8 @@
-// GVM はグラフ生成やノイズ関数のユーティリティを提供する。
 export class GVM {
     // leapNoise はシームレスにループする補間ノイズを生成する。
-    static leapNoise(x: number, loop: number, move: number, seed1: number = 0, seed2: number = 0): number {
+    static leapNoise(x: number, loop: number, move: number, easeFunc: Function = linear, seed1: number = 0, seed2: number = 0): number {
         const count = Math.floor(x / loop);
-        const t = GVM.clamp((x % loop - (loop - move)) / move, 0, 1);
+        const t = easeFunc(GVM.clamp((x % loop - (loop - move)) / move, 0, 1));
 
         const x1 = GVM.uniformRandom(seed1, seed2, count);
         const x2 = GVM.uniformRandom(seed1, seed2, count + 1);
@@ -27,3 +26,7 @@ export class GVM {
         return x - Math.floor(x);
     }
 }
+
+const linear = (x: number): number => {
+    return x;
+};

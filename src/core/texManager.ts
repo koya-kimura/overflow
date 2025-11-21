@@ -2,40 +2,36 @@ import p5 from "p5";
 
 import { BPMManager } from "../rhythm/BPMManager";
 import { bandManager } from "../scenes/bandManager";
-import { APCMiniMK2ToggleMatrix } from "../midi/apcmini_mk2/APCMiniMK2ToggleMatrix";
-// import type { Scene } from "../scenes/Scene";
-import { APCMiniMK2SceneMatrix } from "../midi/apcmini_mk2/APCMiniMK2SceneMatrix";
+import { APCMiniMK2Manager } from "../midi/apcmini_mk2/APCMiniMK2Manager";
 
 // TexManager は描画用の p5.Graphics とシーン、MIDI デバッグ描画のハブを担当する。
 export class TexManager {
     private renderTexture: p5.Graphics | null;
     private bpmManager: BPMManager;
     private bandManager: bandManager;
-    private readonly midiFallback: APCMiniMK2ToggleMatrix;
-    private readonly sceneMatrix: APCMiniMK2SceneMatrix;
+    public sceneMatrix: APCMiniMK2Manager
 
     // コンストラクタではデバッグ用シーン管理と MIDI ハンドラをセットアップする。
     constructor() {
         this.renderTexture = null;
         this.bpmManager = new BPMManager();
         this.bandManager = new bandManager();
-        this.midiFallback = new APCMiniMK2ToggleMatrix();
-        this.sceneMatrix = new APCMiniMK2SceneMatrix();
+        // this.midiFallback = new APCMiniMK2ToggleMatrix();
+        this.sceneMatrix = new APCMiniMK2Manager();
     }
 
     // init はキャンバスサイズに合わせた描画用 Graphics を初期化する。
     init(p: p5): void {
         this.renderTexture = p.createGraphics(p.width, p.height);
 
-        this.sceneMatrix.setMaxOptionsForScene(0, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(1, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(2, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(3, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(4, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(5, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(6, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(7, [2, 2, 2, 2, 2, 2, 2, 2]);
-        this.sceneMatrix.setMaxOptionsForScene(8, [2, 2, 2, 2, 2, 2, 2, 2]);
+        this.sceneMatrix.setMaxOptionsForScene(0, [7, 7, 7, 7, 7, 7, 7, 7]);
+        this.sceneMatrix.setMaxOptionsForScene(1, [7, 7, 7, 7, 7, 7, 7, 7]);
+        this.sceneMatrix.setMaxOptionsForScene(2, [7, 7, 7, 7, 7, 7, 7, 7]);
+        this.sceneMatrix.setMaxOptionsForScene(3, [7, 7, 7, 7, 7, 7, 7, 7]);
+        this.sceneMatrix.setMaxOptionsForScene(4, [7, 7, 7, 7, 7, 7, 7, 7]);
+        this.sceneMatrix.setMaxOptionsForScene(5, [7, 7, 7, 7, 7, 7, 7, 7]);
+        this.sceneMatrix.setMaxOptionsForScene(6, [7, 7, 7, 7, 7, 7, 7, 7]);
+        this.sceneMatrix.setMaxOptionsForScene(7, [7, 7, 7, 7, 7, 7, 7, 7]);
     }
 
     // getTexture は初期化済みの描画バッファを返し、未初期化時はエラーとする。
@@ -60,7 +56,7 @@ export class TexManager {
     update(_p: p5): void {
         this.bpmManager.update()
         this.sceneMatrix.update(Math.floor(this.bpmManager.getBeat()))
-        this.midiFallback.update();
+        // this.midiFallback.update();
     }
 
     // draw はシーン描画と MIDI デバッグオーバーレイを Graphics 上にまとめて描画する。
@@ -73,15 +69,15 @@ export class TexManager {
         texture.push();
         texture.clear();
 
-        this.bandManager.update(p, this.bpmManager.getBeat(), this.sceneMatrix.getParamValues());
-        this.bandManager.draw(p, texture);
+        this.bandManager.update(p, this.bpmManager.getBeat(), this.sceneMatrix.getParamValues(0), this.sceneMatrix.getParamValues(1));
+        this.bandManager.draw(p, texture, this.bpmManager.getBeat());
         texture.pop();
 
-        this.sceneMatrix.drawDebug(p, texture, 24, 24);
+        // this.sceneMatrix.drawDebug(p, texture, 24, 24);
     }
 
     keyPressed(keyCode: number): void {
-        if (keyCode == 13){
+        if (keyCode == 13) {
             this.bpmManager.tapTempo();
         }
     }

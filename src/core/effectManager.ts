@@ -21,7 +21,7 @@ export class EffectManager {
     }
 
     // apply は保持しているシェーダーをアクティブにし、各種 Uniform を設定して描画する。
-    apply(p: p5, sourceTexture: p5.Graphics): void {
+    apply(p: p5, sourceTexture: p5.Graphics, faderValues: number[]): void {
         if (!this.shader) {
             return;
         }
@@ -30,6 +30,8 @@ export class EffectManager {
         this.shader.setUniform("u_tex", sourceTexture);
         this.shader.setUniform("u_resolution", [p.width, p.height]);
         this.shader.setUniform("u_time", p.millis() / 1000.0);
+
+        this.shader.setUniform("u_mosaic", faderValues[0]);
         p.rect(0, 0, p.width, p.height);
     }
 }
