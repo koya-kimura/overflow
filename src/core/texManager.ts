@@ -81,4 +81,12 @@ export class TexManager {
             this.bpmManager.tapTempo();
         }
     }
+
+    getParamsLastRow(): number[] {
+        return this.sceneMatrix.getParamValues(7);
+    }
+
+    getBPM(): number {
+        return this.bpmManager.getBPM();
+    }
 }

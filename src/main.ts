@@ -35,7 +35,7 @@ const sketch = (p: p5) => {
     texManager.update(p);
     texManager.draw(p);
 
-    uiManager.update(p);
+    uiManager.update(p, texManager.getParamsLastRow());
     uiManager.draw(p, font);
 
     effectManager.apply(p, texManager.getTexture(), uiManager.getTexture(), texManager.sceneMatrix.faderValues);
