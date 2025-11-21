@@ -1,4 +1,4 @@
-import p5 from "p5";
+// import p5 from "p5";
 
 // Scene インターフェースは p5 スケッチ内の個別シーンが実装すべき契約を提供する。
 export interface Scene {

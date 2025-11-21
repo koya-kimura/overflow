@@ -67,51 +67,19 @@ const SEGMENT_BUILDERS: ReadonlyArray<(ctx: SegmentContext) => SegmentConfig> = 
 class DigitSegment {
     private readonly base: SegmentConfig;
     private current: SegmentConfig;
-    private visible = true;
     public readonly id: number;
 
     constructor(id: number, base: SegmentConfig) {
-        this.id = id + Date.now();
+        this.id = id;
         this.base = base;
         this.current = { ...this.base };
     }
 
     resetTransform(): void {
         this.current = { ...this.base };
-        this.visible = true;
-    }
-
-    setYOffset(offset: number): void {
-        this.current.y1 = this.base.y1 + offset;
-        this.current.y2 = this.base.y2 + offset;
-    }
-
-    setScaleX(multiplier: number): void {
-        this.current.xscl = this.base.xscl * multiplier;
-    }
-
-    setAlign(align: AlignX): void {
-        this.current.align = align;
-    }
-
-    setVisible(state: boolean): void {
-        this.visible = state;
-    }
-
-    setCustomConfig(config: Partial<SegmentConfig>): void {
-        this.current = { ...this.current, ...config };
-    }
-
-    getBaseConfig(): SegmentConfig {
-        return { ...this.base };
-    }
-
-    getCurrentConfig(): SegmentConfig {
-        return { ...this.current };
     }
 
     draw(drawSegment: DrawSegmentCallback): void {
-        if (!this.visible) return;
         drawSegment(this.id, this.current.y1, this.current.y2, this.current.xscl, this.current.align);
     }
 }
@@ -154,10 +122,6 @@ class SevenSegmentDigit {
         for (const segment of this.segments) {
             segment.draw(drawSegment);
         }
-    }
-
-    getSegments(): readonly DigitSegment[] {
-        return this.segments;
     }
 
     resetSegments(): void {
@@ -474,32 +438,5 @@ export class bandManager implements Scene {
         const rotatedX = translatedX * cosTheta - translatedY * sinTheta;
         const rotatedY = translatedX * sinTheta + translatedY * cosTheta;
         return { x: rotatedX + center.x, y: rotatedY + center.y };
-    }
-
-    drawNumber(p: p5, tex: p5.Graphics, data: BoxCoordinates, number: number = 0, stringAreaTopYScale = 0.3, stringAreaBottomYScale = 0.7) {
-        const numberComp = NUMBER_PATTERNS[number % NUMBER_PATTERNS.length];
-        const stringAreaHeightScale = stringAreaBottomYScale - stringAreaTopYScale;
-        const stringWeight = 0.15;
-        const weightAspect = 2;
-
-        const topY = stringAreaTopYScale;
-        const midY = stringAreaTopYScale + stringAreaHeightScale * 0.5;
-        const bottomY = stringAreaBottomYScale;
-        const hWeight = stringAreaHeightScale * stringWeight;
-
-        // Top
-        if (numberComp[0]) this.drawBand(p, tex, data, topY, topY + hWeight, 1.0, "CENTER");
-        // Bottom
-        if (numberComp[1]) this.drawBand(p, tex, data, bottomY - hWeight, bottomY, 1.0, "CENTER");
-        // Middle
-        if (numberComp[2]) this.drawBand(p, tex, data, midY - hWeight * 0.5, midY + hWeight * 0.5, 1.0, "CENTER");
-        // Top-Left
-        if (numberComp[3]) this.drawBand(p, tex, data, topY, midY, stringWeight * weightAspect, "LEFT");
-        // Top-Right
-        if (numberComp[4]) this.drawBand(p, tex, data, topY, midY, stringWeight * weightAspect, "RIGHT");
-        // Bottom-Left
-        if (numberComp[5]) this.drawBand(p, tex, data, midY, bottomY, stringWeight * weightAspect, "LEFT");
-        // Bottom-Right
-        if (numberComp[6]) this.drawBand(p, tex, data, midY, bottomY, stringWeight * weightAspect, "RIGHT");
     }
 }
