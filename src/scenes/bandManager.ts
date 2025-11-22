@@ -1,5 +1,4 @@
 import p5 from "p5";
-import type { Scene } from "./Scene";
 import { ColorPalette } from "../utils/colorPalette";
 import { UniformRandom } from "../utils/uniformRandom";
 import { GVM } from "../utils/gvm";
@@ -48,10 +47,15 @@ type ResolvedParameters = {
     colorPalette: string[];
 };
 
-export class BandManager implements Scene {
+export class BandManager {
     /**
-     * シーンごとの最大オプション数（TexManager/MIDI連携用）
-     * 0: バンド, 1: 数値, 2: カラーパレット, ...
+     * シーンごとの最大オプション数（TexManager/MIDI連携用）を定義します。
+     * 各シーン（0-7）に対して、8つのパラメータスロットがそれぞれいくつの選択肢を持つかを配列で返します。
+     * 例えば、シーン0の最初のパラメータは6つの選択肢を持ち、2番目は5つの選択肢を持つ、といった具合です。
+     * この情報はMIDIコントローラー（APCMiniMK2Manager）が、
+     * グリッドパッドの選択範囲を制限したり、LED表示を制御したりするために使用されます。
+     *
+     * @returns シーンIDをキーとし、最大オプション数の配列を値とするオブジェクト。
      */
     public static getParameterSchema(): { [sceneId: number]: number[] } {
         return {
@@ -82,6 +86,18 @@ export class BandManager implements Scene {
     private colorPalette: string[] = ColorPalette.colors;
     private numberDisplayController: NumberDisplayController | null = null;
 
+    /**
+     * シーンの状態を更新します。
+     * MIDIコントローラーから受け取った生のパラメータインデックス（bandParams, numberParams）を
+     * 実際の描画パラメータ（座標スケール、モード、数値タイプなど）に変換（resolve）します。
+     * また、BPMに基づいたイージング計算や、カラーパレットの更新もここで行います。
+     *
+     * @param p p5.jsのインスタンス。
+     * @param beat 現在のビート数。
+     * @param bandParams バンドエフェクト用のパラメータインデックス配列。
+     * @param numberParams 数値表示エフェクト用のパラメータインデックス配列。
+     * @param colorPalette 現在のカラーパレット。
+     */
     update(p: p5, beat: number, bandParams: number[], numberParams: number[], colorPalette: string[]): void {
         const resolved = this.resolveParameters(p, beat, bandParams, numberParams, colorPalette);
         this.applyBandParameters(resolved.band);
@@ -89,6 +105,16 @@ export class BandManager implements Scene {
         this.colorPalette = resolved.colorPalette;
     }
 
+    /**
+     * シーンを描画します。
+     * 設定されたパラメータ（lineCountなど）に基づいて、複数のライン（バンドと数値）を描画します。
+     * 各ラインについて、台形の座標計算（createSegmentBoxForLine）を行い、
+     * その座標に基づいて背景のバンド（drawBandForLine）と前面の数値（drawNumberDisplay）を描画します。
+     *
+     * @param p p5.jsのインスタンス。
+     * @param tex 描画対象のGraphicsオブジェクト。
+     * @param beat 現在のビート数。
+     */
     draw(p: p5, tex: p5.Graphics, beat: number): void {
         this.ensureNumberDisplayCount(this.lineCount);
         const displayController = this.ensureNumberDisplayController();
@@ -113,6 +139,14 @@ export class BandManager implements Scene {
         }
     }
 
+    /**
+     * 数値表示用オブジェクト（SevenSegmentDigit）の配列サイズを調整します。
+     * 必要な数（count）より少ない場合は新しく生成して追加し、
+     * 多い場合は切り詰めます。
+     * これにより、ライン数が動的に変化しても適切な数のディスプレイオブジェクトが維持されます。
+     *
+     * @param count 必要な数値表示オブジェクトの数。
+     */
     private ensureNumberDisplayCount(count: number): void {
         while (this.numberDisplays.length < count) {
             this.numberDisplays.push(new SevenSegmentDigit());
@@ -122,6 +156,21 @@ export class BandManager implements Scene {
         }
     }
 
+    /**
+     * 現在の描画モード（mode）とビートに基づいて、特定のインデックスを描画すべきかどうかを判定します。
+     * - all: 常に描画。
+     * - sequence: ビートに合わせて順番に1つずつ描画。
+     * - speedSeqence: sequenceの4倍速。
+     * - highSpeedSeqence: sequenceの8倍速。
+     * - random: ビートごとにランダムに1つ選んで描画。
+     * - none: 描画しない。
+     *
+     * @param mode 描画モード。
+     * @param index 判定対象のラインインデックス。
+     * @param beat 現在のビート数。
+     * @param count ラインの総数。
+     * @returns 描画すべきであれば true。
+     */
     private shouldDraw(mode: DrawMode, index: number, beat: number, count: number): boolean {
         switch (mode) {
             case "all": return true;
@@ -134,6 +183,19 @@ export class BandManager implements Scene {
         }
     }
 
+    /**
+     * 指定されたラインインデックスに対応する台形（セグメントボックス）の座標を計算します。
+     * 画面全体を分割し、指定されたスケール（topLeftScaleXなど）に基づいて
+     * 各ラインの四隅の座標（topX1, topX2, bottomX1, bottomX2）を決定します。
+     *
+     * @param p p5.jsのインスタンス。
+     * @param lineIndex ラインのインデックス。
+     * @param topLeftScaleX 上辺左側のX座標スケール。
+     * @param topRightScaleX 上辺右側のX座標スケール。
+     * @param bottomLeftScaleX 下辺左側のX座標スケール。
+     * @param bottomRightScaleX 下辺右側のX座標スケール。
+     * @returns 計算されたボックス座標（BoxCoordinates）。
+     */
     private createSegmentBoxForLine(
         p: p5,
         lineIndex: number,
@@ -157,6 +219,17 @@ export class BandManager implements Scene {
         });
     }
 
+    /**
+     * 指定されたラインの背景バンド（台形）を描画します。
+     * カラーパレットから色を選択し、`drawTrapezoidBand` を使用して描画します。
+     * `shouldDraw` による表示判定もここで行われます。
+     *
+     * @param p p5.jsのインスタンス。
+     * @param tex 描画対象のGraphicsオブジェクト。
+     * @param baseBox 描画する台形の基本座標。
+     * @param lineIndex ラインのインデックス。
+     * @param beat 現在のビート数。
+     */
     private drawBandForLine(p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
         tex.noStroke();
         tex.fill(this.colorPalette[lineIndex % this.colorPalette.length]);
@@ -174,6 +247,20 @@ export class BandManager implements Scene {
         });
     }
 
+    /**
+     * 指定されたラインに数値（7セグメントディスプレイ風）を描画します。
+     * `NumberDisplayController` を使用して表示すべき数値やアニメーションパラメータを決定し、
+     * `SevenSegmentDigit` クラスを用いて実際の描画を行います。
+     * 各セグメント（棒）ごとに座標変換（移動、回転、変形）を行い、
+     * 複雑なモーショングラフィックスを実現しています。
+     *
+     * @param p p5.jsのインスタンス。
+     * @param tex 描画対象のGraphicsオブジェクト。
+     * @param baseBox 描画基準となる台形の座標。
+     * @param lineIndex ラインのインデックス。
+     * @param beat 現在のビート数。
+     * @param displayController 数値表示の制御ロジックを持つコントローラー。
+     */
     private drawNumberDisplay(
         p: p5,
         tex: p5.Graphics,
@@ -242,6 +329,20 @@ export class BandManager implements Scene {
         });
     }
 
+    /**
+     * MIDIパラメータインデックスを、実際の描画パラメータオブジェクトに解決（変換）します。
+     * インデックスに基づいて、事前に定義されたオプション配列（width/height, count, modeなど）から
+     * 具体的な値を選択します。
+     * また、イージング関数やノイズ関数を使用して、動的に変化するパラメータ（zigzag, noiseVal）も計算し、
+     * オプションの選択ロジックに組み込んでいます。
+     *
+     * @param p p5.jsのインスタンス。
+     * @param beat 現在のビート数。
+     * @param bandParams バンドパラメータのインデックス配列。
+     * @param numberParams 数値パラメータのインデックス配列。
+     * @param colorPalette カラーパレット。
+     * @returns 解決されたパラメータセット（ResolvedParameters）。
+     */
     private resolveParameters(
         p: p5,
         beat: number,
@@ -310,6 +411,13 @@ export class BandManager implements Scene {
         };
     }
 
+    /**
+     * 解決されたバンドパラメータをクラスのメンバ変数に適用します。
+     * パラメータが変更された場合、数値表示コントローラー（numberDisplayController）をリセットし、
+     * 次回の描画時に再生成されるようにします。
+     *
+     * @param band バンドパラメータセット。
+     */
     private applyBandParameters(band: BandParameterSet): void {
         this.mode = band.mode;
         this.lineCount = band.lineCount;
@@ -319,6 +427,12 @@ export class BandManager implements Scene {
         this.numberDisplayController = null;
     }
 
+    /**
+     * 解決された数値パラメータをクラスのメンバ変数に適用します。
+     * パラメータが変更された場合、数値表示コントローラーをリセットします。
+     *
+     * @param number 数値パラメータセット。
+     */
     private applyNumberParameters(number: NumberParameterSet): void {
         this.numberActiveType = number.numberActiveType;
         this.numberValueType = number.numberValueType;
@@ -329,11 +443,23 @@ export class BandManager implements Scene {
         this.numberDisplayController = null;
     }
 
+    /**
+     * 数値表示コントローラーのインスタンスを取得します。
+     * 存在しない場合は新規作成し、存在する場合は既存のものを返します（遅延初期化）。
+     * パラメータ変更時にnullにリセットされるため、常に最新のパラメータに基づいたコントローラーが使用されます。
+     *
+     * @returns NumberDisplayControllerインスタンス。
+     */
     private ensureNumberDisplayController(): NumberDisplayController {
         this.numberDisplayController ??= this.createNumberDisplayController();
         return this.numberDisplayController;
     }
 
+    /**
+     * 現在のパラメータ設定に基づいて、新しいNumberDisplayControllerインスタンスを作成します。
+     *
+     * @returns 新しいNumberDisplayControllerインスタンス。
+     */
     private createNumberDisplayController(): NumberDisplayController {
         return new NumberDisplayController({
             valueType: this.numberValueType,

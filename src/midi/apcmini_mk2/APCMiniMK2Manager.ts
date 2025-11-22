@@ -92,6 +92,14 @@ export class APCMiniMK2Manager extends MIDIManager {
     /** グリッドパッドの全状態を保持 [sceneIndex][columnIndex] */
     public gridRadioState: GridParameterState[][];
 
+    /**
+     * APCMiniMK2Managerクラスのコンストラクタです。
+     * フェーダー、ボタン、グリッドの状態を初期化し、MIDIメッセージのコールバックを設定します。
+     * グリッドの状態（gridRadioState）は、8つのシーン × 8つのカラムの2次元配列として初期化され、
+     * 各セルは選択状態、最大オプション数、ランダムモードの状態などを保持します。
+     * また、ランダムフェーダーコントローラーも初期化され、時間経過による自動変化の準備を行います。
+     * 親クラス（MIDIManager）のコンストラクタも呼び出され、MIDIデバイスへの接続が開始されます。
+     */
     constructor() {
         super();
         this.faderValues = new Array(9).fill(0);
@@ -114,6 +122,15 @@ export class APCMiniMK2Manager extends MIDIManager {
         this.onMidiMessageCallback = this.handleMIDIMessage.bind(this);
     }
 
+    /**
+     * 現在アクティブなシーンを変更します。
+     * シーンインデックスは0から7の範囲で指定します。
+     * 範囲外のインデックスが指定された場合は無視されます。
+     * シーンが切り替わると、グリッドパッドのLED表示や制御対象のパラメータセットが
+     * 即座に新しいシーンのものに切り替わります。
+     *
+     * @param index 切り替え先のシーンインデックス（0-7）。
+     */
     public selectScene(index: number): void {
         if (index < 0 || index >= GRID_COLS) {
             return;
@@ -123,15 +140,27 @@ export class APCMiniMK2Manager extends MIDIManager {
     }
 
     /**
-    * 現在選択中のシーンのパラメーター値を取得する。ランダムモードを自動でチェック。
-    */
+     * 指定されたシーン（デフォルトは現在のシーン）のパラメータ値の配列を取得します。
+     * 各カラム（0-7）について、ランダムモードが有効な場合は現在のランダム値を、
+     * 無効な場合は手動で選択された行インデックスを返します。
+     * これにより、描画側はランダムか手動かを意識せずに、現在のパラメータ値を取得して利用できます。
+     *
+     * @param sceneIndex 取得対象のシーンインデックス（省略時は現在のシーン）。
+     * @returns パラメータ値（0〜maxOptions-1）の配列。
+     */
     public getParamValues(sceneIndex: number = this.currentSceneIndex): number[] {
         const params = this.gridRadioState[sceneIndex];
         return params.map((param) => (param.isRandom ? param.randomValue : param.selectedRow));
     }
 
     /**
-     * 特定のシーンのmaxOptionsを一括設定する。
+     * 指定されたシーンの各カラムにおける最大選択肢数（maxOptions）を一括設定します。
+     * アプリケーションの初期化時や設定変更時に呼び出され、
+     * 各パラメータが取りうる値の範囲（例：0〜3、0〜7など）を定義します。
+     * maxOptionsが変更されると、現在の選択値が範囲内に収まるように自動的に調整（クランプ）されます。
+     *
+     * @param sceneIndex 設定対象のシーンインデックス。
+     * @param optionsArray 各カラムのmaxOptionsを指定する数値配列（長さ8）。
      */
     public setMaxOptionsForScene(sceneIndex: number, optionsArray: number[]): void {
         if (sceneIndex < 0 || sceneIndex >= GRID_COLS || optionsArray.length !== GRID_COLS) {
@@ -166,7 +195,13 @@ export class APCMiniMK2Manager extends MIDIManager {
     }
 
     /**
-     * メインループからの更新処理。ランダム値の更新とLED出力を実行する。
+     * メインループから毎フレーム呼び出される更新処理です。
+     * 1. グリッドのランダム値を更新（BPM同期など）。
+     * 2. フェーダーの値を更新（ランダムモード時の自動変化など）。
+     * 3. MIDIコントローラーへのLED出力（現在の状態をハードウェアに反映）。
+     * を順に行います。
+     *
+     * @param tempoIndex テンポ同期のためのインデックス（シード値として使用）。
      */
     public update(tempoIndex: number = 0): void {
         this.updateRandomGridValues(tempoIndex);
@@ -177,6 +212,15 @@ export class APCMiniMK2Manager extends MIDIManager {
         this.midiOutputSendControls();
     }
 
+    /**
+     * グリッドパラメータのランダム値を更新します。
+     * ランダムモードが有効なパラメータに対して、
+     * 与えられた `tempoIndex` とカラムインデックスを組み合わせたシード値を用いて
+     * 新しいランダムな値を計算・設定します。
+     * これにより、BPMに同期したランダムなパラメータ変化を実現します。
+     *
+     * @param tempoIndex テンポ同期のためのインデックス。
+     */
     private updateRandomGridValues(tempoIndex: number): void {
         for (let sceneIndex = 0; sceneIndex < GRID_COLS; sceneIndex++) {
             const params = this.gridRadioState[sceneIndex];
@@ -200,7 +244,12 @@ export class APCMiniMK2Manager extends MIDIManager {
     }
 
     /**
-     * MIDIメッセージ受信時の処理 (入力)
+     * MIDIメッセージを受信した際のメインハンドラです。
+     * 受信したメッセージのステータスバイトとデータバイトを解析し、
+     * メッセージの種類（フェーダーボタン、サイドボタン、グリッドパッド、フェーダー操作）に応じて
+     * 適切な処理メソッドに振り分けます。
+     *
+     * @param message 受信したMIDIメッセージイベント。
      */
     protected handleMIDIMessage(message: WebMidi.MIDIMessageEvent): void {
         const [statusByte, dataByte1, dataByte2] = message.data;
@@ -308,7 +357,14 @@ export class APCMiniMK2Manager extends MIDIManager {
     }
 
     /**
-     * フェーダー値の更新。ボタンがONの場合は強制的に0にする。
+     * 指定されたインデックスのフェーダー値を更新します。
+     * `RandomFaderController` を使用して、現在のモード（手動/ランダム）、
+     * ボタンのトグル状態、前回の値、現在時刻に基づいて、
+     * 最終的なフェーダー値を再計算します。
+     * 例えば、ボタンがONの場合は値が強制的に0になったり、
+     * ランダムモードの場合は自動的に値が変動したりします。
+     *
+     * @param index 更新対象のフェーダーインデックス（0-8）。
      */
     protected updateFaderValue(index: number): void {
         const now = getCurrentTimestamp();
@@ -324,7 +380,10 @@ export class APCMiniMK2Manager extends MIDIManager {
     }
 
     /**
-     * APC Mini MK2へのMIDI出力 (LED制御)
+     * 現在の内部状態に基づいて、APC Mini MK2のLEDを更新するためのMIDIメッセージを送信します。
+     * シーン選択ボタン、グリッドパッド、フェーダーボタンのLED状態を一括で更新します。
+     * これにより、ハードウェアの見た目とソフトウェアの状態を同期させます。
+     * 毎フレーム呼び出されることを想定しています。
      */
     protected midiOutputSendControls(): void {
         this.sendSceneButtonLeds();
@@ -417,6 +476,14 @@ export class APCMiniMK2Manager extends MIDIManager {
         return LED_COLORS.RED;
     }
 
+    /**
+     * フェーダーボタンの動作モードを設定します。
+     * モードが変更された場合、現在時刻を基準にしてフェーダーコントローラーの状態を同期させます。
+     * これにより、モード切替時の値の急激な変化を防いだり、
+     * 新しいモードでの動作を即座に開始したりします。
+     *
+     * @param mode 設定するモード ("random" | "manual" など)。
+     */
     public setFaderButtonMode(mode: FaderButtonMode): void {
         if (this.faderButtonMode === mode) {
             return;
@@ -438,7 +505,12 @@ export class APCMiniMK2Manager extends MIDIManager {
     }
 
     /**
-     * MIDIメッセージを送信するヘルパー (MIDIManager経由)
+     * MIDIメッセージを送信するための内部ヘルパーメソッドです。
+     * ステータスバイトと2つのデータバイトを受け取り、配列として `sendMessage` に渡します。
+     *
+     * @param status MIDIステータスバイト。
+     * @param data1 第1データバイト（ノート番号など）。
+     * @param data2 第2データバイト（ベロシティなど）。
      */
     private send(status: number, data1: number, data2: number): void {
         this.sendMessage([status, data1, data2]);

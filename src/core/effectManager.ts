@@ -8,7 +8,18 @@ export class EffectManager {
         this.shader = null;
     }
 
-    // load は頂点・フラグメントシェーダーを読み込み、Promise を待機して保持する。
+    /**
+     * 指定されたパスから頂点シェーダーとフラグメントシェーダーを非同期で読み込みます。
+     * p5.jsのloadShader関数を使用し、シェーダーオブジェクトを作成してクラス内部に保持します。
+     * 読み込み処理がPromiseを返す場合（特定のp5.jsのバージョンや環境など）にも対応しており、
+     * async/awaitを用いてシェーダーのロード完了を確実に待機します。
+     * これにより、描画ループが開始される前にシェーダーリソースが確実に利用可能な状態になることを保証します。
+     *
+     * @param p p5.jsのインスタンス。シェーダーのロード機能を提供します。
+     * @param vertPath 頂点シェーダーファイルのパス（.vert）。
+     * @param fragPath フラグメントシェーダーファイルのパス（.frag）。
+     * @returns シェーダーの読み込みが完了した後に解決されるPromise。
+     */
     async load(p: p5, vertPath: string, fragPath: string): Promise<void> {
         const shaderOrPromise = p.loadShader(vertPath, fragPath);
 
@@ -19,7 +30,23 @@ export class EffectManager {
         }
     }
 
-    // apply は保持しているシェーダーをアクティブにし、各種 Uniform を設定して描画する。
+    /**
+     * 現在のフレームに対してポストエフェクトシェーダーを適用し、最終的な描画を行います。
+     * 複数のテクスチャ（ソース、UI、キャプチャ）と、MIDIコントローラーなどからの入力値（フェーダー、グリッド）を
+     * シェーダーのUniform変数として設定します。
+     * これにより、モザイク、波形歪み、色反転、ジッターなどのエフェクトを動的に制御します。
+     * また、全体の不透明度や背景シーンの回転タイプなどもここで反映されます。
+     * 最後に画面全体を覆う矩形を描画することで、シェーダーの効果をキャンバス全体に適用します。
+     *
+     * @param p p5.jsのインスタンス。
+     * @param sourceTexture メインの描画内容が含まれるグラフィックスオブジェクト。
+     * @param uiTexture UI要素（テキストなど）が含まれるグラフィックスオブジェクト。
+     * @param captureTexture 以前のフレームやカメラ入力などのキャプチャ用テクスチャ。
+     * @param faderValues MIDIフェーダーからの入力値配列。エフェクトの強度制御に使用。
+     * @param gridValues MIDIグリッドボタンからの入力値配列。シーン切り替えなどに使用。
+     * @param beat 現在のビート情報。リズムに合わせたエフェクト同期に使用。
+     * @param colorPaletteRGBArray カラーパレットのRGB値がフラットに並んだ配列。
+     */
     apply(p: p5, sourceTexture: p5.Graphics, uiTexture: p5.Graphics, captureTexture: p5.Graphics, faderValues: number[], gridValues: number[], beat: number = 0, colorPaletteRGBArray: number[]): void {
         if (!this.shader) {
             return;

@@ -85,6 +85,16 @@ export class SevenSegmentDigit {
         weightAspect: 2,
     };
 
+    /**
+     * 表示する数値を設定します。
+     * 指定された数値（0-9）に基づいて、必要なセグメント（棒）の構成を再構築します。
+     * レイアウトオプションが指定された場合は、それらも適用して形状を更新します。
+     * 数値やレイアウトに変更がない場合は、再構築をスキップしてパフォーマンスを最適化します。
+     *
+     * @param number 表示したい数値（0-9）。範囲外の値は正規化されます。
+     * @param options レイアウトオプション（太さや高さなど）のオーバーライド。
+     * @param control 再構築や変形リセットを強制するための制御フラグ。
+     */
     setNumber(
         number: number,
         options?: Partial<SegmentLayoutOptions>,
@@ -113,18 +123,40 @@ export class SevenSegmentDigit {
         }
     }
 
+    /**
+     * 現在の数値に対応するすべてのセグメントを描画します。
+     * 実際の描画処理はコールバック関数（drawSegment）に委譲されます。
+     * これにより、描画ロジック（p5.jsへの依存など）をこのクラスから分離し、
+     * 柔軟な描画実装（例えば、台形描画やエフェクト適用など）を可能にしています。
+     *
+     * @param drawSegment セグメントごとの描画を行うコールバック関数。
+     */
     draw(drawSegment: DrawSegmentCallback): void {
         for (const segment of this.segments) {
             segment.draw(drawSegment);
         }
     }
 
+    /**
+     * すべてのセグメントの変形状態を初期状態（ベース状態）にリセットします。
+     * アニメーションなどで一時的に変形された状態を元に戻すために使用されます。
+     */
     resetSegments(): void {
         for (const segment of this.segments) {
             segment.resetTransform();
         }
     }
 
+    /**
+     * 指定された数値とレイアウトに基づいて、セグメントオブジェクトの配列を生成します。
+     * 0-9の各数値に対応する点灯パターン（NUMBER_PATTERNS）を参照し、
+     * 点灯すべきセグメントのみを作成します。
+     * 各セグメントの座標や形状は、SEGMENT_BUILDERSを使用して計算されます。
+     *
+     * @param number 表示する数値。
+     * @param layout レイアウト設定。
+     * @returns 生成されたDigitSegmentの配列。
+     */
     private createSegments(number: number, layout: SegmentLayoutOptions): DigitSegment[] {
         const context = this.createContext(layout);
         const pattern = NUMBER_PATTERNS[number];
@@ -139,6 +171,13 @@ export class SevenSegmentDigit {
         return segments;
     }
 
+    /**
+     * レイアウトオプションから、セグメント生成に必要なコンテキスト情報（座標基準点など）を計算します。
+     * 上端、下端、中間点のY座標や、セグメントの太さなどを算出します。
+     *
+     * @param layout レイアウトオプション。
+     * @returns 計算されたSegmentContext。
+     */
     private createContext(layout: SegmentLayoutOptions): SegmentContext {
         const stringAreaHeightScale = layout.stringAreaBottomYScale - layout.stringAreaTopYScale;
         const topY = layout.stringAreaTopYScale;
@@ -156,11 +195,27 @@ export class SevenSegmentDigit {
         };
     }
 
+    /**
+     * 入力された数値を0-9の範囲に正規化します。
+     * 負の値や10以上の値が入力された場合でも、循環するように計算します。
+     *
+     * @param number 入力数値。
+     * @returns 0-9の整数。
+     */
     private normalizeNumber(number: number): number {
         const patternLength = NUMBER_PATTERNS.length;
         return ((number % patternLength) + patternLength) % patternLength;
     }
 
+    /**
+     * 2つのレイアウトオプションが等しいかどうかを判定します。
+     * オブジェクトの各プロパティを比較し、すべて一致する場合にtrueを返します。
+     * 不要な再構築を防ぐために使用されます。
+     *
+     * @param a 比較対象のレイアウトA。
+     * @param b 比較対象のレイアウトB。
+     * @returns 等しければtrue。
+     */
     private areLayoutsEqual(a: SegmentLayoutOptions, b: SegmentLayoutOptions): boolean {
         return (
             a.stringAreaTopYScale === b.stringAreaTopYScale &&
@@ -170,6 +225,13 @@ export class SevenSegmentDigit {
         );
     }
 
+    /**
+     * 現在アクティブなセグメントの数を取得します。
+     * 例えば、数字の「1」なら2本、「8」なら7本となります。
+     * アニメーションのエフェクト計算などで使用されます。
+     *
+     * @returns アクティブなセグメント数。
+     */
     public getSegmentCount(): number {
         return this.segments.length;
     }

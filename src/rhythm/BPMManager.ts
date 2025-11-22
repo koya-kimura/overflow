@@ -20,7 +20,16 @@ export class BPMManager {
     private readonly TAP_HISTORY_SIZE: number = 4; // テンポ計算に使うタップ数の最大値
     private readonly TAP_TIMEOUT: number = 2000;   // 連続タップが途切れるまでのミリ秒
 
-    // constructor は初期 BPM を設定しカウントを開始する。
+    /**
+     * BPMManagerクラスのコンストラクタです。
+     * 初期BPMを設定し、それに基づいた1ビートあたりの時間間隔（ミリ秒）を計算します。
+     * また、ビートカウントや再生状態などの内部変数を初期化し、
+     * 即座にstartメソッドを呼び出して計測を開始します。
+     * デフォルトのBPMは120ですが、引数で任意の値を指定可能です。
+     * アプリケーションの起動と同時にリズム管理が始まるように設計されています。
+     *
+     * @param initialBPM 初期BPM値（デフォルト: 120）。
+     */
     constructor(initialBPM: number = 120) {
         this.bpm = initialBPM;
         this.interval = 60000 / initialBPM;
@@ -35,7 +44,14 @@ export class BPMManager {
     // --- BPM管理機能 ---
 
     /**
-     * 新しいBPM値を設定し、次のビートの開始時に適用されるように予約します。
+     * 新しいBPM値を設定します。
+     * ただし、即座に変更を適用するのではなく、次のビートのタイミングまで変更を保留します。
+     * これは、演奏中やアニメーション中に急激にリズムが変わることで生じる
+     * 視覚的・聴覚的な違和感（グリッチ）を防ぐためです。
+     * 変更は `pendingBPM` に保存され、`update` メソッド内で適切なタイミングで適用されます。
+     * 既に同じBPMが設定されている場合は何もしません。
+     *
+     * @param newBPM 設定したい新しいBPM値。
      */
     public setBPM(newBPM: number): void {
         if (newBPM !== this.bpm) {
@@ -46,7 +62,12 @@ export class BPMManager {
     }
 
     /**
-     * カウントを開始します。
+     * ビートの計測（再生）を開始します。
+     * 停止状態から再開する場合や、初期化時に呼び出されます。
+     * 内部のタイマー基準点（lastUpdateTime）を現在時刻にリセットし、
+     * ビートカウントを0に戻します。
+     * これにより、曲の頭出しのような挙動になります。
+     * 既に再生中の場合は何もしません。
      */
     public start(): void {
         if (!this.isPlaying) {
@@ -58,7 +79,10 @@ export class BPMManager {
     }
 
     /**
-     * カウントを停止します。
+     * ビートの計測を停止します。
+     * isPlayingフラグをfalseに設定し、updateメソッドでの計算をスキップさせます。
+     * 一時停止機能として使用されます。
+     * 再度 start() を呼ぶと、カウントはリセットされて再開されます。
      */
     public stop(): void {
         this.isPlaying = false;
@@ -66,7 +90,13 @@ export class BPMManager {
     }
 
     /**
-     * メインループから毎フレーム呼び出され、ビートを更新します。
+     * 毎フレーム呼び出される更新処理です。
+     * 現在時刻と前回の更新時刻の差分（デルタタイム）を計算し、経過時間（elapsed）に加算します。
+     * 経過時間が1ビートの間隔（interval）を超えた場合、ビートカウントを増やし、
+     * 経過時間をリセット（剰余演算）します。
+     * また、このタイミングで保留されていたBPM変更があれば適用します。
+     * これにより、フレームレートに依存せず、実時間に基づいた正確なリズム管理を実現します。
+     * ビートが更新されたフレームでは isBeatUpdated フラグを true にします。
      */
     public update(): void {
         const currentTime = performance.now();
@@ -101,21 +131,35 @@ export class BPMManager {
     }
 
     /**
-     * 現在のビートを連続的な値で取得します。
+     * 現在の累積ビート数を浮動小数点数で取得します。
+     * 整数部分はこれまでに経過した総ビート数、小数部分は現在のビート内の進行度（0.0〜1.0未満）を表します。
+     * この値を使用することで、ビートに同期した滑らかなアニメーション
+     * （例えば、sin(beat * PI) での点滅や移動など）を実装することができます。
+     *
+     * @returns 現在の累積ビート数（浮動小数点数）。
      */
     public getBeat(): number {
         return this.beatCount + (this.elapsed / this.interval);
     }
 
     /**
-     * 直前の update() でビート更新（整数値のカウントアップ）があったかを取得します。
+     * 直前のフレームでビートが更新された（整数カウントが増加した）かどうかを取得します。
+     * 「ジャスト」のタイミングでイベントを発火させたい場合（例：シーンの切り替え、効果音の再生）に便利です。
+     * このフラグは update() が呼ばれるたびにリセット・再計算されるため、
+     * 1フレームの間だけ true になります。
+     *
+     * @returns ビート更新フレームであれば true。
      */
     public isBeatUpdatedNow(): boolean {
         return this.isBeatUpdated;
     }
 
     /**
-     * 現在のBPM値を取得します。
+     * 現在設定されているBPM値を取得します。
+     * UI表示や、他のコンポーネントが現在のテンポを知るために使用します。
+     * 保留中の変更がある場合でも、現在適用されている値を返します。
+     *
+     * @returns 現在のBPM値。
      */
     public getBPM(): number {
         return this.bpm;
@@ -124,7 +168,12 @@ export class BPMManager {
     // --- タップテンポ機能 ---
 
     /**
-     * テンポをタップします。
+     * タップテンポ機能のエントリーポイントです。
+     * ユーザー入力（キー押下やボタンクリックなど）があったタイミングで呼び出されます。
+     * 現在時刻を記録し、過去のタップ履歴に追加します。
+     * 一定時間（TAP_TIMEOUT）以上間隔が空いた場合は、新しいセッションとして履歴をリセットします。
+     * 履歴が2回以上蓄積されると、calculateBPMFromTapsを呼び出してBPMを再計算します。
+     * これにより、直感的な操作で楽曲のテンポに合わせることができます。
      */
     public tapTempo(): void {
         const currentTime = performance.now();
@@ -149,7 +198,11 @@ export class BPMManager {
     }
 
     /**
-     * タップ履歴から平均インターバルを計算し、新しいBPMを設定します。
+     * 蓄積されたタップ履歴に基づいて平均BPMを計算し、適用します。
+     * 隣り合うタップ時刻の差分（インターバル）を計算し、それらの平均値を求めます。
+     * その平均インターバルからBPM（1分間の拍数）を算出し、setBPMメソッドを通じて設定します。
+     * 履歴の数が多いほど平均化されて安定しますが、TAP_HISTORY_SIZEで制限することで
+     * テンポの変化に対する追従性も確保しています。
      */
     private calculateBPMFromTaps(): void {
         if (this.tapTimes.length < 2) return;
