@@ -48,7 +48,7 @@ type ResolvedParameters = {
     colorPalette: string[];
 };
 
-export class bandManager implements Scene {
+export class BandManager implements Scene {
     private mode: DrawMode = "all";
     private bandWidthHeightScale: { width: number, height: number } = { width: 1.0, height: 1.0 };
     private topBotomCenterScaleX: { top: number, bottom: number } = { top: 1.0, bottom: 1.0 };

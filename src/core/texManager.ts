@@ -1,7 +1,7 @@
 import p5 from "p5";
 
 import { BPMManager } from "../rhythm/BPMManager";
-import { bandManager } from "../scenes/bandManager";
+import { BandManager } from "../scenes/bandManager";
 import { APCMiniMK2Manager } from "../midi/apcmini_mk2/APCMiniMK2Manager";
 import { ColorPalette } from "../utils/colorPalette";
 
@@ -9,14 +9,14 @@ import { ColorPalette } from "../utils/colorPalette";
 export class TexManager {
     private renderTexture: p5.Graphics | null;
     private bpmManager: BPMManager;
-    private bandManager: bandManager;
+    private bandManager: BandManager;
     public sceneMatrix: APCMiniMK2Manager
 
     // コンストラクタではデバッグ用シーン管理と MIDI ハンドラをセットアップする。
     constructor() {
         this.renderTexture = null;
         this.bpmManager = new BPMManager();
-        this.bandManager = new bandManager();
+        this.bandManager = new BandManager();
         // this.midiFallback = new APCMiniMK2ToggleMatrix();
         this.sceneMatrix = new APCMiniMK2Manager();
     }
@@ -82,7 +82,7 @@ export class TexManager {
         // this.sceneMatrix.drawDebug(p, texture, 24, 24);
     }
 
-    getBandManager(): bandManager {
+    getBandManager(): BandManager {
         return this.bandManager;
     }
 

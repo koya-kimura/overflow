@@ -1,6 +1,14 @@
 // src/midi/APCMiniMK2Manager.ts
 
 import { MIDIManager } from "../midiManager";
+import {
+    clampGridSelection,
+    clampUnitRange,
+    getCurrentTimestamp,
+    pseudoRandomFromSeed,
+    randomDurationInRange,
+    type NumericRange,
+} from "../utils";
 
 // --- 定数定義: MIDIステータスとノートレンジ ---
 const MIDI_STATUS = {
@@ -31,7 +39,7 @@ const GRID_ROWS = 8;
 const GRID_COLS = 8;
 
 // LEDのベロシティ (色) 定義
-const LED_COLOR = {
+const LED_COLORS = {
     OFF: 0,
     RED: 3,           // 選択可能/初期色 (変更: 5 -> 3)
     // BLUE はシーン毎に色を割り当てるため個別配列で扱う
@@ -102,8 +110,8 @@ export class APCMiniMK2Manager extends MIDIManager {
     private randomSceneMode: boolean;
     private faderButtonMode: FaderButtonMode;
     private faderRandomStates: FaderRandomState[];
-    private readonly randomLowDurationRange = { min: 1200, max: 4000 };
-    private readonly randomHighDurationRange = { min: 80, max: 220 };
+    private readonly randomLowDurationRange: NumericRange = { min: 1200, max: 4000 };
+    private readonly randomHighDurationRange: NumericRange = { min: 80, max: 220 };
     private keyboardFallbackActive: boolean = false;
     private keyboardFallbackNoticeShown: boolean = false;
     private readonly handleKeyDownRef: (event: KeyboardEvent) => void;
@@ -220,31 +228,23 @@ export class APCMiniMK2Manager extends MIDIManager {
      * メインループからの更新処理。ランダム値の更新とLED出力を実行する。
      */
     public update(tempoIndex: number = 0): void {
-        for(let i = 0; i < 8; i++) {
+        for (let i = 0; i < 8; i++) {
             const currentScene = this.gridRadioState[i];
             currentScene.forEach((param, colIndex) => {
                 if (param.isRandom) {
                     // ランダム値をBPMに同期して更新
-                    param.randomValue = Math.floor(this.simplePseudoRandom(tempoIndex + colIndex) * param.maxOptions);
+                    param.randomValue = Math.floor(pseudoRandomFromSeed(tempoIndex + colIndex) * param.maxOptions);
                 }
             });
         }
 
-        this.processRandomFaders(this.getTimestamp());
+        this.processRandomFaders(getCurrentTimestamp());
 
         this.midiOutputSendControls();
     }
 
     public isKeyboardFallbackActive(): boolean {
         return this.keyboardFallbackActive;
-    }
-
-    /**
-     * 簡易な擬似乱数生成
-     */
-    private simplePseudoRandom(seed: number): number {
-        const x = Math.sin(seed * 99999 + 1) * 10000;
-        return x - Math.floor(x);
     }
 
     private enableKeyboardFallback(): void {
@@ -348,7 +348,7 @@ export class APCMiniMK2Manager extends MIDIManager {
         this.faderButtonToggleState[index] = 0;
         this.deactivateRandomFader(index);
 
-        const nextValue = this.clamp01(this.faderValuesPrev[index] + delta);
+        const nextValue = clampUnitRange(this.faderValuesPrev[index] + delta);
         this.faderValuesPrev[index] = nextValue;
         this.faderValues[index] = nextValue;
         return true;
@@ -365,7 +365,7 @@ export class APCMiniMK2Manager extends MIDIManager {
         if (event.altKey) {
             param.isRandom = !param.isRandom;
             if (!param.isRandom) {
-                param.selectedRow = this.clampGridSelection(param.selectedRow, param.maxOptions);
+                param.selectedRow = clampGridSelection(param.selectedRow, param.maxOptions);
             } else {
                 param.randomValue = Math.floor(Math.random() * param.maxOptions);
             }
@@ -374,108 +374,139 @@ export class APCMiniMK2Manager extends MIDIManager {
 
         const direction = event.shiftKey ? -1 : 1;
         param.isRandom = false;
-        const nextRow = this.clampGridSelection(param.selectedRow + direction, param.maxOptions);
+        const nextRow = clampGridSelection(param.selectedRow + direction, param.maxOptions);
         if (nextRow !== param.selectedRow) {
             param.selectedRow = nextRow;
         }
         return true;
     }
 
-    private clampGridSelection(value: number, maxOptions: number): number {
-        const maxIndex = Math.max(0, Math.min(7, maxOptions - 1));
-        if (value < 0) {
-            return 0;
-        }
-        if (value > maxIndex) {
-            return maxIndex;
-        }
-        return value;
-    }
-
-    private clamp01(value: number): number {
-        if (value < 0) {
-            return 0;
-        }
-        if (value > 1) {
-            return 1;
-        }
-        return value;
-    }
-
     /**
      * MIDIメッセージ受信時の処理 (入力)
      */
     protected handleMIDIMessage(message: WebMidi.MIDIMessageEvent): void {
-        const [status, data1, data2] = message.data;
-        const velocity = data2;
+        const [statusByte, dataByte1, dataByte2] = message.data;
+        const noteNumber = dataByte1;
+        const velocity = dataByte2;
 
-        // SHIFT ボタンのトグル操作
-        if ((status === MIDI_STATUS.NOTE_ON || status === MIDI_STATUS.NOTE_OFF) && data1 === SPECIAL_NOTES.SHIFT) {
-            if (status === MIDI_STATUS.NOTE_ON && velocity > 0) {
-                this.randomSceneMode = !this.randomSceneMode;
-            }
+        if (this.handleShiftToggle(statusByte, noteNumber, velocity)) {
             return;
         }
 
-        // フェーダーボタンの処理 (トグル入力)
-        if (status === MIDI_STATUS.NOTE_ON && (
-            (data1 >= NOTE_RANGES.FADER_BUTTONS.START && data1 <= NOTE_RANGES.FADER_BUTTONS.END) ||
-            data1 === NOTE_RANGES.FADER_BUTTON_8
-        )) {
-            const index = (data1 >= NOTE_RANGES.FADER_BUTTONS.START) ? data1 - NOTE_RANGES.FADER_BUTTONS.START : 8;
-            if (velocity > 0) {
-                this.faderButtonToggleState[index] = 1 - this.faderButtonToggleState[index];
-                this.updateFaderValue(index);
-            }
+        if (this.handleFaderButton(statusByte, noteNumber, velocity)) {
+            return;
         }
 
-        // サイドボタンの処理 (シーン切り替え/ラジオボタン)
-        else if (status === MIDI_STATUS.NOTE_ON && data1 >= NOTE_RANGES.SIDE_BUTTONS.START && data1 <= NOTE_RANGES.SIDE_BUTTONS.END) {
-            const index = data1 - NOTE_RANGES.SIDE_BUTTONS.START;
-            if (velocity > 0) {
-                this.selectScene(index);
-            }
+        if (this.handleSideButton(statusByte, noteNumber, velocity)) {
+            return;
         }
 
-        // グリッドパッドの処理 (パラメーター選択/ラジオボタンとランダムトグル)
-        else if (status === MIDI_STATUS.NOTE_ON && data1 >= NOTE_RANGES.GRID.START && data1 <= NOTE_RANGES.GRID.END) {
-            const gridIndex = data1 - NOTE_RANGES.GRID.START;
-            const colIndex = gridIndex % GRID_COLS;
-            const rowIndex = GRID_ROWS - 1 - Math.floor(gridIndex / GRID_COLS); // 行を0-7 (下から上へ) に変換
-
-            if (velocity > 0) {
-                const param = this.gridRadioState[this.currentSceneIndex][colIndex];
-
-                if (rowIndex === 7) {
-                    // 8行目: ランダムモードのトグル
-                    param.isRandom = !param.isRandom;
-                    if (!param.isRandom) {
-                        // ランダム解除時、選択肢内の一番上に強制移動
-                        param.selectedRow = param.maxOptions > 0 ? Math.min(param.maxOptions - 1, 6) : 0;
-                    }
-                }
-                else if (rowIndex < param.maxOptions) {
-                    // 選択肢内の行: ラジオボタン入力
-                    param.selectedRow = rowIndex;
-                    param.isRandom = false; // 明示的な選択はランダムを解除
-                }
-            }
+        if (this.handleGridPad(statusByte, noteNumber, velocity)) {
+            return;
         }
 
-        // フェーダーの処理 (CC入力)
-        else if (status === MIDI_STATUS.CONTROL_CHANGE && data1 >= NOTE_RANGES.FADERS.START && data1 <= NOTE_RANGES.FADERS.END) {
-            const index = data1 - NOTE_RANGES.FADERS.START;
-            const normalizedValue = data2 / 127;
-            this.faderValuesPrev[index] = normalizedValue;
+        this.handleFaderControlChange(statusByte, noteNumber, velocity);
+    }
+
+    private handleShiftToggle(statusByte: number, noteNumber: number, velocity: number): boolean {
+        if ((statusByte === MIDI_STATUS.NOTE_ON || statusByte === MIDI_STATUS.NOTE_OFF) && noteNumber === SPECIAL_NOTES.SHIFT) {
+            if (statusByte === MIDI_STATUS.NOTE_ON && velocity > 0) {
+                this.randomSceneMode = !this.randomSceneMode;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private handleFaderButton(statusByte: number, noteNumber: number, velocity: number): boolean {
+        const isFaderButton = statusByte === MIDI_STATUS.NOTE_ON && (
+            (noteNumber >= NOTE_RANGES.FADER_BUTTONS.START && noteNumber <= NOTE_RANGES.FADER_BUTTONS.END) ||
+            noteNumber === NOTE_RANGES.FADER_BUTTON_8
+        );
+
+        if (!isFaderButton) {
+            return false;
+        }
+
+        if (velocity > 0) {
+            const index = noteNumber >= NOTE_RANGES.FADER_BUTTONS.START ? noteNumber - NOTE_RANGES.FADER_BUTTONS.START : 8;
+            this.faderButtonToggleState[index] = 1 - this.faderButtonToggleState[index];
             this.updateFaderValue(index);
         }
+
+        return true;
+    }
+
+    private handleSideButton(statusByte: number, noteNumber: number, velocity: number): boolean {
+        const isSideButton = statusByte === MIDI_STATUS.NOTE_ON &&
+            noteNumber >= NOTE_RANGES.SIDE_BUTTONS.START &&
+            noteNumber <= NOTE_RANGES.SIDE_BUTTONS.END;
+
+        if (!isSideButton) {
+            return false;
+        }
+
+        if (velocity > 0) {
+            const sceneIndex = noteNumber - NOTE_RANGES.SIDE_BUTTONS.START;
+            this.selectScene(sceneIndex);
+        }
+
+        return true;
+    }
+
+    private handleGridPad(statusByte: number, noteNumber: number, velocity: number): boolean {
+        const isGridPad = statusByte === MIDI_STATUS.NOTE_ON &&
+            noteNumber >= NOTE_RANGES.GRID.START &&
+            noteNumber <= NOTE_RANGES.GRID.END;
+
+        if (!isGridPad) {
+            return false;
+        }
+
+        if (velocity <= 0) {
+            return true;
+        }
+
+        const gridIndex = noteNumber - NOTE_RANGES.GRID.START;
+        const colIndex = gridIndex % GRID_COLS;
+        const rowIndex = GRID_ROWS - 1 - Math.floor(gridIndex / GRID_COLS);
+        const param = this.gridRadioState[this.currentSceneIndex][colIndex];
+
+        if (rowIndex === 7) {
+            param.isRandom = !param.isRandom;
+            if (!param.isRandom) {
+                param.selectedRow = param.maxOptions > 0 ? Math.min(param.maxOptions - 1, 6) : 0;
+            }
+            return true;
+        }
+
+        if (rowIndex < param.maxOptions) {
+            param.selectedRow = rowIndex;
+            param.isRandom = false;
+        }
+        return true;
+    }
+
+    private handleFaderControlChange(statusByte: number, noteNumber: number, value: number): void {
+        const isFaderControlChange = statusByte === MIDI_STATUS.CONTROL_CHANGE &&
+            noteNumber >= NOTE_RANGES.FADERS.START &&
+            noteNumber <= NOTE_RANGES.FADERS.END;
+
+        if (!isFaderControlChange) {
+            return;
+        }
+
+        const index = noteNumber - NOTE_RANGES.FADERS.START;
+        const normalizedValue = value / 127;
+        this.faderValuesPrev[index] = normalizedValue;
+        this.updateFaderValue(index);
     }
 
     /**
      * フェーダー値の更新。ボタンがONの場合は強制的に0にする。
      */
     protected updateFaderValue(index: number): void {
-        const now = this.getTimestamp();
+        const now = getCurrentTimestamp();
 
         if (this.faderButtonMode === "mute") {
             this.deactivateRandomFader(index);
@@ -496,15 +527,20 @@ export class APCMiniMK2Manager extends MIDIManager {
      * APC Mini MK2へのMIDI出力 (LED制御)
      */
     protected midiOutputSendControls(): void {
-        // 1. サイドボタンのLED制御 (選択中のシーンのみ点灯)
+        this.sendSceneButtonLeds();
+        this.sendGridPadLeds();
+        this.sendFaderButtonLeds();
+    }
+
+    private sendSceneButtonLeds(): void {
         for (let i = 0; i < 8; i++) {
             const note = NOTE_RANGES.SIDE_BUTTONS.START + i;
-            const velocity = (i === this.currentSceneIndex) ? LED_COLOR.BRIGHT_WHITE : LED_COLOR.OFF;
-            // サイドボタンは元のステータス 0x90 を使用して送信
+            const velocity = (i === this.currentSceneIndex) ? LED_COLORS.BRIGHT_WHITE : LED_COLORS.OFF;
             this.send(MIDI_STATUS.NOTE_ON, note, velocity);
         }
+    }
 
-        // 2. グリッドパッドのLED制御 (パラメーター状態の視覚化)
+    private sendGridPadLeds(): void {
         const currentScene = this.gridRadioState[this.currentSceneIndex];
 
         for (let col = 0; col < GRID_COLS; col++) {
@@ -514,40 +550,33 @@ export class APCMiniMK2Manager extends MIDIManager {
             for (let row = 0; row < GRID_ROWS; row++) {
                 const gridIndex = (GRID_ROWS - 1 - row) * GRID_COLS + col;
                 const note = NOTE_RANGES.GRID.START + gridIndex;
-                let velocity = LED_COLOR.OFF;
+                let velocity = LED_COLORS.OFF;
 
                 if (row === 7) {
-                    // 8行目: ランダムモードの状態
-                    velocity = param.isRandom ? RANDOM_ON_COLOR : LED_COLOR.RED;
+                    velocity = param.isRandom ? RANDOM_ON_COLOR : LED_COLORS.RED;
                 }
                 else if (row < activeRows) {
-                    // 選択肢内の行
                     const currentValue = param.isRandom ? param.randomValue : param.selectedRow;
 
                     if (row === currentValue) {
-                        // アクティブな選択: シーンごとの色を使用
                         const sceneColor = SIDE_ACTIVE_COLORS[this.currentSceneIndex] ?? DEFAULT_ACTIVE_COLOR;
                         velocity = sceneColor;
                     } else {
-                        // 選択可能な非アクティブな選択 (赤)
-                        velocity = LED_COLOR.RED;
+                        velocity = LED_COLORS.RED;
                     }
                 }
 
                 this.send(MIDI_OUTPUT_STATUS.NOTE_ON, note, velocity);
             }
         }
+    }
 
-        // 3. フェーダーボタンのLED制御 (トグル状態の表示)
+    private sendFaderButtonLeds(): void {
         for (let i = 0; i < 9; i++) {
-            let note: number;
-            if (i < 8) {
-                note = NOTE_RANGES.FADER_BUTTONS.START + i;
-            } else {
-                note = NOTE_RANGES.FADER_BUTTON_8;
-            }
-            const velocity = this.faderButtonToggleState[i] ? LED_COLOR.BRIGHT_WHITE : LED_COLOR.OFF;
-            // フェーダーボタンは元のステータス 0x90 を使用して送信
+            const note = (i < 8)
+                ? NOTE_RANGES.FADER_BUTTONS.START + i
+                : NOTE_RANGES.FADER_BUTTON_8;
+            const velocity = this.faderButtonToggleState[i] ? LED_COLORS.BRIGHT_WHITE : LED_COLORS.OFF;
             this.send(MIDI_STATUS.NOTE_ON, note, velocity);
         }
     }
@@ -558,7 +587,7 @@ export class APCMiniMK2Manager extends MIDIManager {
         }
 
         this.faderButtonMode = mode;
-        const now = this.getTimestamp();
+        const now = getCurrentTimestamp();
 
         for (let i = 0; i < this.faderButtonToggleState.length; i++) {
             if (mode === "random") {
@@ -635,11 +664,8 @@ export class APCMiniMK2Manager extends MIDIManager {
         }
     }
 
-    private getRandomDuration(range: { min: number; max: number }): number {
-        if (range.min >= range.max) {
-            return range.min;
-        }
-        return range.min + Math.random() * (range.max - range.min);
+    private getRandomDuration(range: NumericRange): number {
+        return randomDurationInRange(range);
     }
 
     private getRandomLowDuration(): number {
@@ -648,13 +674,6 @@ export class APCMiniMK2Manager extends MIDIManager {
 
     private getRandomHighDuration(): number {
         return this.getRandomDuration(this.randomHighDurationRange);
-    }
-
-    private getTimestamp(): number {
-        if (typeof performance !== "undefined" && typeof performance.now === "function") {
-            return performance.now();
-        }
-        return Date.now();
     }
 
     /**

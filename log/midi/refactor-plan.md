@@ -1,0 +1,62 @@
+# MIDI リファクタリング計画（2025-11-22）
+
+## 現状整理
+
+- `MIDIManager`
+  - requestMIDIAccess の初期化、MIDI port の取得、送受信 callback セットを担当する基底クラス。
+  - エラーハンドリングは console 出力と availability フラグのみ。
+- `APCMiniMK2Manager`
+  - 600 行超で入力・LED 出力・フォールバック・乱数制御まで一手に内包。
+  - 定数（ノートレンジ、LED 色、キー割当など）がファイル先頭に固まっているが、機能別分類が無い。
+  - `update` → `processRandomFaders` → `midiOutputSendControls` が毎フレーム呼ばれる。
+
+## 課題
+
+1. 入力処理
+   - `handleMIDIMessage` がステータス毎に長大な if/else を持つ。
+   - ベロシティやノート番号の命名が文脈依存（data1/data2）で読み解きづらい。
+2. LED 出力
+   - `midiOutputSendControls` でサイドボタン/グリッド/フェーダーを同時処理。
+   - LED カラーが定数化されているが、責務別に分けられていない。
+3. ランダムフェーダー
+   - `activateRandomFader` 等が内部 state を直接操作し、副作用が複数箇所で発生。
+   - 乱数処理や時間取得が manager 内に散在。
+4. キーボードフォールバック
+   - オン/オフ判定・キー割当処理が `handleFallbackKeyDown` 1 メソッドに集約され、 SRP 違反。
+5. テスト難
+   - util 化されていない関数 (clamp, random, timestamp) が多数。
+
+## 分割案（フェーズ制）
+
+### フェーズ 1: util 抽出（完了）
+- `src/midi/utils.ts` に以下を移動：
+  - clampGridSelection / clampUnitRange
+  - pseudoRandomFromSeed / randomDurationInRange
+  - getCurrentTimestamp
+- APCMini から重複メソッドを削除して util を利用。
+
+### フェーズ 2: 入力処理の再構成
+- `handleMIDIMessage` を以下のメソッドへ分割：
+  - `handleShiftToggle`
+  - `handleFaderButton`
+  - `handleSideButton`
+  - `handleGridPad`
+  - `handleFaderControlChange`
+- データバイトの命名を `statusByte`, `noteNumber`, `velocity` 等へリネームし、コメントを削減。
+
+### フェーズ 3: LED 出力パイプライン（進行中）
+- `midiOutputSendControls` をセクションごとに private メソッド化。（完了）
+- LED カラー定数を `LED_COLORS` へ整理し、用途別に命名を調整。（完了）
+- 送信処理を `sendNoteOn` ヘルパーに集約。（未着手）
+
+### フェーズ 4: ランダムフェーダー
+- `FaderRandomState` 管理を専用クラス（例: `RandomFaderController`）へ切り出し。
+- `processRandomFaders` のロジックを util 化し、テスト容易性を向上。
+
+### フェーズ 5: フォールバック入力
+- キーボードフォールバックを `KeyboardFallbackController` に抽出。
+- `APCMiniMK2Manager` は controller のコールバック登録のみ担当。
+
+### フェーズ 6: テストとドキュメント
+- util への単体テスト導入を検討（Jest or Vitest）。
+- README に MIDI 操作とフォールバック手順を追記予定。

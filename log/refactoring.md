@@ -114,6 +114,29 @@
 - `draw` では 1 フレームにつき 1 度だけコントローラを取得し、`drawNumberDisplay` に引き渡す構造に変更してループ内の `ensure` 呼び出しを解消。
 - p5 インスタンスは `p`、意図的に未使用の引数は先頭 `_`、それ以外はキャメルケースを基準とするネーミング方針を確立。
 - Scene インターフェースを `update(p, beat, bandParams, numberParams, colorPalette)` / `draw(p, target, beat)` の明示契約に更新し、`bandManager` と `TexManager` を新シグネチャへ追従。
+- `BandManager` へクラス名を改名し、呼び出し元（`TexManager`/`UIManager`/`main.ts`）の型注釈と import を揃えた。
+
+### MIDI リファクタリング計画（検討開始 2025-11-22）
+
+- 既存実装は `MIDIManager` が初期化と send ヘルパーを提供し、`APCMiniMK2Manager` が 600 行超の状態管理・入出力処理を単一クラスで担当している。
+- 入力処理: `handleMIDIMessage` に SHIFT トグル、フェーダーボタン、サイドボタン、グリッド、CC の分岐が集中。命名は概ね CamelCase だが、行列インデックスなどで追加説明コメントが必要。
+- 出力処理: `midiOutputSendControls` でサイドボタン/グリッド/フェーダーボタンの LED を一括制御。定数やカラー定義は同一ファイルに混在。
+- 補助ロジック: キーボードフォールバック、ランダムフェーダー、クランプ/乱数/時間取得など汎用ヘルパーが同ファイルに内包されており、テスト性が低い。
+- **次アクション案**
+	1. MIDI 入力・LED 出力・ランダムフェーダー・フォールバックを責務単位で分割する構造案を作成し、既存メソッド呼び出し順序を時系列で整理。
+	2. `clamp01`/`clampGridSelection`/`simplePseudoRandom` などを `src/midi/utils.ts`（仮）に抽出し、ユニットテスト導入を見据えてフェーダー関連ロジックから切り離す。
+	3. `handleMIDIMessage` を入力種別ごとの小メソッドへ分割し、命名規約に沿った引数名へ統一（例: `statusByte`, `noteNumber`, `velocity`).
+	4. `midiOutputSendControls` の LED 更新をセクション別ヘルパーへ分け、カラー定数群を `const` オブジェクトとして util 化。
+	5. キーボードフォールバックを専用クラスへ抽出し、MIDI 未接続時の初期化/解放を明示的に管理。
+- 上記方針に沿って段階的に改修し、各ステップ後に `npm run build` と手動動作確認を実施予定。
+
+#### 実施記録 2025-11-22
+
+- `src/midi/utils.ts` を新設し、`clampGridSelection` / `clampUnitRange` / `pseudoRandomFromSeed` / `randomDurationInRange` / `getCurrentTimestamp` を共通化。
+- `APCMiniMK2Manager` から上記ヘルパーを削除・移譲し、`NumericRange` 型でフェーダー乱数の範囲を明示。
+- `update`・フォールバック処理・ランダムフェーダー更新で util を利用するよう書き換え、`processRandomFaders` での時刻取得も共通化。
+- `handleMIDIMessage` を `handleShiftToggle` / `handleFaderButton` / `handleSideButton` / `handleGridPad` / `handleFaderControlChange` の分岐メソッドへ再構成し、可読性と今後の責務分離を容易にした。
+- `midiOutputSendControls` を `sendSceneButtonLeds` / `sendGridPadLeds` / `sendFaderButtonLeds` へ分割し、LED カラー定義を `LED_COLORS` へ整理して視認性と保守性を向上。
 
 ### UIManager 型整備（2025-11-22）
 

@@ -1,13 +1,13 @@
 import p5 from "p5";
 import type { TexManager } from "./texManager";
-import type { bandManager } from "../scenes/bandManager";
+import type { BandManager } from "../scenes/bandManager";
 import type { EffectManager } from "./effectManager";
 import { DateText } from "../utils/dateText";
 import { Easing } from "../utils/easing";
 
 type UIDrawResources = {
     texManager: TexManager;
-    bandManager: bandManager;
+    bandManager: BandManager;
     effectManager: EffectManager;
     captureTexture: p5.Graphics | undefined;
     bpm: number;
