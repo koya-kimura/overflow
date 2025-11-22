@@ -209,8 +209,6 @@ export class UIManager {
         texture.clear();
         texture.textFont(font);
         texture.textAlign(p.CENTER, p.CENTER);
-        texture.fill(255);
-        texture.noStroke();
 
         const baseSize = Math.min(texture.width, texture.height) * 0.07;
 
@@ -224,6 +222,12 @@ export class UIManager {
             texture.translate(posX, posY);
             texture.rotate(state.rotation.current);
             texture.textSize(textSize);
+            texture.fill(0, 50);
+            texture.noStroke();
+            texture.text(textValue, Math.min(texture.width, texture.height) * 0.002, Math.min(texture.width, texture.height) * 0.002);
+
+            texture.fill(255);
+            texture.noStroke();
             texture.text(textValue, 0, 0);
             texture.pop();
         });

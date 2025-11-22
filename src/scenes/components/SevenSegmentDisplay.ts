@@ -169,4 +169,8 @@ export class SevenSegmentDigit {
             a.weightAspect === b.weightAspect
         );
     }
+
+    public getSegmentCount(): number {
+        return this.segments.length;
+    }
 }

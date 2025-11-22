@@ -2,12 +2,16 @@ export class GVM {
     // leapNoise はシームレスにループする補間ノイズを生成する。
     static leapNoise(x: number, loop: number, move: number, easeFunc: Function = linear, seed1: number = 0, seed2: number = 0): number {
         const count = Math.floor(x / loop);
-        const t = easeFunc(GVM.clamp((x % loop - (loop - move)) / move, 0, 1));
+        const t = GVM.leapRamp(x, loop, move, easeFunc);
 
         const x1 = GVM.uniformRandom(seed1, seed2, count);
         const x2 = GVM.uniformRandom(seed1, seed2, count + 1);
 
         return GVM.map(t, 0, 1, x1, x2);
+    }
+
+    static leapRamp(x: number, loop: number, move: number, easeFunc: Function = linear){
+        return easeFunc(GVM.clamp((x % loop - (loop - move)) / move, 0, 1));
     }
 
     // map は入力値を指定範囲から別の範囲へ線形変換する。

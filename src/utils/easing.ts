@@ -135,4 +135,8 @@ export class Easing {
             (Math.pow(2 * x, 2) * ((c2 + 1) * 2 * x - c2)) / 2 :
             (Math.pow(2 * x - 2, 2) * ((c2 + 1) * (x * 2 - 2) + c2) + 2) / 2;
     }
+
+    static zigzag(x: number): number {
+        return Math.abs((x % 2) - 1);
+    }
 }

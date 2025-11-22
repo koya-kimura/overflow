@@ -3,6 +3,7 @@ import p5 from "p5";
 import { BPMManager } from "../rhythm/BPMManager";
 import { bandManager } from "../scenes/bandManager";
 import { APCMiniMK2Manager } from "../midi/apcmini_mk2/APCMiniMK2Manager";
+import { ColorPalette } from "../utils/colorPalette";
 
 // TexManager は描画用の p5.Graphics とシーン、MIDI デバッグ描画のハブを担当する。
 export class TexManager {
@@ -69,11 +70,21 @@ export class TexManager {
         texture.push();
         texture.clear();
 
-        this.bandManager.update(p, this.bpmManager.getBeat(), this.sceneMatrix.getParamValues(0), this.sceneMatrix.getParamValues(1));
+        this.bandManager.update(p, this.bpmManager.getBeat(), this.sceneMatrix.getParamValues(0), this.sceneMatrix.getParamValues(1), this.getColorPalette());
         this.bandManager.draw(p, texture, this.bpmManager.getBeat());
         texture.pop();
 
         // this.sceneMatrix.drawDebug(p, texture, 24, 24);
+    }
+
+    getColorPalette(): string[] {
+        const colorPaletteBooleanArray = this.sceneMatrix.getParamValues(2).map(value => value == 0);
+        return ColorPalette.getColorArray(colorPaletteBooleanArray);
+    }
+
+    getColorPaletteRGB(): number[] {
+        const colorPaletteBooleanArray = this.sceneMatrix.getParamValues(2).map(value => value == 0);
+        return ColorPalette.getColorRGBArray(colorPaletteBooleanArray)
     }
 
     keyPressed(keyCode: number): void {
@@ -82,11 +93,15 @@ export class TexManager {
         }
     }
 
-    getParamsLastRow(): number[] {
-        return this.sceneMatrix.getParamValues(7);
+    getParamsRow(row: number = 7): number[] {
+        return this.sceneMatrix.getParamValues(row);
     }
 
     getBPM(): number {
         return this.bpmManager.getBPM();
+    }
+
+    getBeat(): number {
+        return this.bpmManager.getBeat();
     }
 }

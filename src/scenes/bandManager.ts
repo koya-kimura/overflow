@@ -28,9 +28,13 @@ export class bandManager implements Scene {
     private numberDisplays: SevenSegmentDigit[] = [];
     private numberValueType = "one";
     private numberMoveType: string = "none";
+    private numberArrangeType: string = "simple";
+    private numberMovingType: string = "none";
+    private numberRotateType: string = "none";
 
+    private colorPalette: string[] = ColorPalette.colors;
 
-    update(_p: p5, beat: number, bandParamValues: number[], NumberParamValues: number[]): void {
+    update(_p: p5, beat: number, bandParamValues: number[], NumberParamValues: number[], colorPalette: string[]): void {
         const zigzag = Math.abs(beat % 2 - 1.0);
         const noiseVal = GVM.leapNoise(beat, 1, 1, Easing.easeInOutQuad);
         const easeZigzag1 = Easing.easeInOutQuad(zigzag);
@@ -65,6 +69,9 @@ export class bandManager implements Scene {
         ];
         const numberValueTypeOptions = ["one", "two", "date", "time", "sequence", "random", "beat"]
         const numberMoveTypeOptions = ["none", "down", "wave", "sequence"]
+        const numberArrangeTypeOptions = ["simple", "center", "horizontal", "vertical", "grid", "circle", "random"];
+        const numberMovingTypeOptions = ["none", "zigzag", "ramp", "period"];
+        const numberRotateTypeOptions = ["none", "lap", "shake", "period"];
 
         this.mode = modeOptions[bandParamValues[0]] ?? "none";
         this.lineCount = countOptions[bandParamValues[1]] ?? 1.0;
@@ -75,6 +82,11 @@ export class bandManager implements Scene {
         this.numberActiveType = modeOptions[NumberParamValues[0]] ?? "none";
         this.numberValueType = numberValueTypeOptions[NumberParamValues[1]] ?? "one";
         this.numberMoveType = numberMoveTypeOptions[NumberParamValues[2]] ?? "none";
+        this.numberArrangeType = numberArrangeTypeOptions[NumberParamValues[3]] ?? "simple";
+        this.numberMovingType = numberMovingTypeOptions[NumberParamValues[4]] ?? "none";
+        this.numberRotateType = numberRotateTypeOptions[NumberParamValues[5]] ?? "none";
+
+        this.colorPalette = colorPalette;
     }
 
     draw(_p: p5, tex: p5.Graphics, beat: number): void {
@@ -101,7 +113,7 @@ export class bandManager implements Scene {
             });
 
             tex.noStroke();
-            tex.fill(ColorPalette.colors[i % ColorPalette.colors.length]);
+            tex.fill(this.colorPalette[i % this.colorPalette.length]);
 
             if (this.shouldDraw(this.mode, i, beat, this.lineCount)) {
                 drawTrapezoidBand({
@@ -140,14 +152,32 @@ export class bandManager implements Scene {
                         align,
                     });
                     const segmentCenter = computePolygonCenter(vertices);
-                    const targetX = tex.width * 0.5;
-                    const targetY = tex.height * 0.5;
+                    const targetPositionCenter = this.numberArrangeType === "simple" ? segmentCenter :
+                        this.numberArrangeType === "center" ? { x: _p.width * 0.5, y: _p.height * 0.5 } :
+                        this.numberArrangeType === "horizontal" ? { x: _p.width * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1), y: _p.height * 0.5 } :
+                        this.numberArrangeType === "vertical" ? { x: _p.width * 0.5, y: _p.height * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1) } :
+                        this.numberArrangeType === "grid" ? {
+                            x: _p.width * ((segmentId % Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
+                            y: _p.height * (Math.floor(segmentId / Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
+                        } :
+                        this.numberArrangeType === "circle" ? {
+                            x: _p.width * 0.5 + Math.cos((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.width * 0.25),
+                            y: _p.height * 0.5 + Math.sin((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.height * 0.25),
+                        } :
+                        this.numberArrangeType === "random" ? {
+                            x: UniformRandom.rand(baseSeed , 1, Math.floor(beat * 0.5)) * _p.width,
+                            y: UniformRandom.rand(baseSeed , 2, Math.floor(beat * 0.5)) * _p.height,
+                        } :
+                        segmentCenter;
+                    
+                    const moving = this.numberMovingType === "none" ? 1.0 :
+                        this.numberMovingType === "zigzag" ? Math.abs((beat % 2.0) - 1.0) :
+                        this.numberMovingType === "ramp" ? Easing.easeInOutQuad(_p.fract(beat)) :
+                        this.numberMovingType === "period" ? GVM.leapRamp(beat, 4, 1, Easing.easeInOutQuad) :
+                        1.0;
 
-                    // const xOffset = (targetX - segmentCenter.x) * Math.abs(beat % 2.0 - 1.0);
-                    // const yOffset = (targetY - segmentCenter.y)  * Math.abs(beat % 2.0 - 1.0);
-
-                    const xOffset = 0;
-                    const yOffset = 0;
+                    const xOffset = (targetPositionCenter.x - segmentCenter.x) * moving;
+                    const yOffset = (targetPositionCenter.y - segmentCenter.y) * moving;
 
                     const yMoveOffset = 
                         this.numberMoveType === "down" ? ((Easing.easeOutQuad((_p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (_p.height * 1.25) :
@@ -156,7 +186,11 @@ export class bandManager implements Scene {
                         0;
 
 
-                    const rotationAngle = 0;
+                    const rotationAngle = this.numberRotateType === "none" ? 0 :
+                        this.numberRotateType === "lap" ? Easing.easeInOutSine( _p.fract(beat / 4) ) * Math.PI * 2 :
+                        this.numberRotateType === "shake" ? Easing.zigzag(beat) * Math.PI / 10:
+                        this.numberRotateType === "period" ? GVM.leapNoise(beat, 4, 1, Easing.easeInOutSine, segmentId) * Math.PI * 2:
+                        0;
                     const translatedBox = translateBox(baseBox, xOffset);
                     const normalizedYOffset = (yOffset + yMoveOffset) / tex.height;
 
