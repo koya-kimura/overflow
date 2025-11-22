@@ -15,6 +15,7 @@ uniform float u_mosaic;
 uniform float u_wave;
 uniform float u_invert;
 uniform float u_jitter;
+uniform float u_right;
 
 uniform float u_mainOpacity;
 uniform float u_bgOpacity;
@@ -105,9 +106,13 @@ vec4 sampleTextureSafe(sampler2D tex, vec2 uv) {
 void main(void) {
     vec2 uv = vTexCoord;
 
+    if(u_right == 1.0) {
+        uv.x = mod(uv.x + .5 * u_right, 1.);
+    } 
+    
     if(u_jitter > 0.0) {
         uv -= vec2(.5, .5);
-        uv *= pow(zigzag(u_beat / 2.), 2.0) * 0.5 * u_jitter + 0.5;
+        uv *= pow(zigzag((u_beat + 1.) / 2.), 2.0) * 1. * u_jitter + 1.;
         uv += vec2(.5, .5);
     }
     if(u_mosaic > 0.0)
@@ -115,7 +120,7 @@ void main(void) {
     if(u_wave > 0.0)
         uv.x += zigzag(u_beat / 2.) * 0.2 * sin(uv.y * 30.0 + u_beat * PI) * u_wave;
 
-    vec4 col = mix(vec4(0.0), texture2D(u_tex, uv), u_mainOpacity);
+    vec4 col = vec4(texture2D(u_tex, uv).rgb, mix(0., texture2D(u_tex, uv).a, u_mainOpacity));
 
     // ==============
 
@@ -174,20 +179,20 @@ void main(void) {
         }
     }
 
-    if(col.a < 0.5)
+    if(col.a == 0.0)
         col = mix(col, bgcol, u_bgOpacity);
     // if(!(abs((vTexCoord - vec2(.5)).y) < areaHeight && abs((vTexCoord - vec2(.5)).x) < areaHeight * u_resolution.x / u_resolution.y)) col = bgcol;
 
     // ==============
 
-    if(u_invert > 0.0)
-        col.rgb = mix(col.rgb, vec3(1.0) - col.rgb, u_invert);
+    if(u_invert > 0.0 && col.r + col.g + col.b == 0.0)
+        col.rgb = mix(col.rgb, vec3(1.0) - col.rgb, floor(u_invert));
     if(col.a == 0.0)
         col = vec4(0.0, 0.0, 0.0, 1.0);
 
     // ==============
 
-    col.rgb *= u_masterOpacity;
+    // col.rgb *= u_masterOpacity;
 
     vec4 uicol = texture2D(u_uiTex, vTexCoord);
     uicol *= u_uiOpacity;

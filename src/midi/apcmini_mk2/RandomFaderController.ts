@@ -52,6 +52,10 @@ export class RandomFaderController {
      * @returns 計算された新しいフェーダー値。
      */
     public recomputeValue(index: number, mode: FaderButtonMode, toggleState: number, prevValue: number, now: number): number {
+        // index範囲外ガード
+        if (index < 0 || index >= this.states.length) {
+            return prevValue;
+        }
         if (mode === "mute") {
             this.deactivate(index);
             return toggleState ? 0 : prevValue;
@@ -156,6 +160,9 @@ export class RandomFaderController {
      */
     public deactivate(index: number): void {
         const state = this.states[index];
+        if (!state) {
+            return;
+        }
         if (!state.isActive && state.currentValue === 0) {
             return;
         }

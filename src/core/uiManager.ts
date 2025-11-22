@@ -1,42 +1,8 @@
 import p5 from "p5";
-import type { TexManager } from "./texManager";
-import type { BandManager } from "../scenes/bandManager";
-import type { EffectManager } from "./effectManager";
 import { DateText } from "../utils/dateText";
 import { Easing } from "../utils/easing";
 
-type UIDrawResources = {
-    texManager: TexManager;
-    bandManager: BandManager;
-    effectManager: EffectManager;
-    captureTexture: p5.Graphics | undefined;
-    bpm: number;
-    beat: number;
-    paramsRows: number[][];
-    colorPalette: string[];
-    colorPaletteRGB: number[];
-};
-
-type UIDrawContext = UIDrawResources & {
-    p: p5;
-    tex: p5.Graphics;
-    font: p5.Font;
-};
-
-type UIDrawFunction = (context: UIDrawContext) => void;
-
-/**
- * UI描画関数その1（インデックス0）。
- * 現在は何も描画しない「空の」UIパターンとして定義されています。
- * テクスチャをクリアするだけの処理を行い、画面上にUI要素を表示したくない場合に使用されます。
- * 将来的に新しいUIパターンを追加する際のプレースホルダーとしても機能します。
- *
- * @param context 描画に必要なコンテキスト情報（テクスチャ、p5インスタンスなど）。
- */
-const UIDraw01: UIDrawFunction = ({ tex }) => {
-    tex.clear();
-    // UI表示なし
-};
+type UIDrawFunction = (p: p5, tex: p5.Graphics, font: p5.Font, beat: number, bpm: number) => void;
 
 /**
  * UI描画関数その2（インデックス1）。
@@ -50,22 +16,19 @@ const UIDraw01: UIDrawFunction = ({ tex }) => {
  *
  * @param context 描画に必要なコンテキスト情報。
  */
-const UIDraw02: UIDrawFunction = ({
-    p,
-    tex,
-    font,
-    bpm,
-    beat,
-}) => {
+const UIDraw01: UIDrawFunction = (p: p5, tex: p5.Graphics, font: p5.Font, beat: number, bpm: number): void => {
     tex.push();
     tex.textFont(font);
 
     tex.push();
-    tex.textAlign(p.CENTER, p.CENTER);
-    tex.fill(255);
     tex.noStroke();
-    tex.textSize(Math.min(tex.width, tex.height) * 0.15);
-    tex.text("TAKASHIMA & KIMURA", tex.width / 2, tex.height / 2);
+    tex.textSize(tex.width * 0.015);
+    tex.fill(255);
+    tex.textAlign(p.LEFT, p.TOP)
+    tex.text("DJ：TAKASHIMA", tex.width * 0.03, tex.height * 0.1);
+
+    tex.textAlign(p.RIGHT, p.TOP)
+    tex.text("KIMURA：VJ", tex.width * 0.97, tex.height * 0.1);
     tex.pop();
 
     const n = 50;
@@ -115,7 +78,6 @@ const UIDraw02: UIDrawFunction = ({
 
 const UIDRAWERS: readonly UIDrawFunction[] = [
     UIDraw01,
-    UIDraw02,
 ];
 
 // UIManager は単純なテキストオーバーレイの描画を担当する。
@@ -210,7 +172,7 @@ export class UIManager {
      * @param font UI描画に使用するフォント。
      * @param resources その他の描画に必要なリソース群（BPM、ビート、カラーパレットなど）。
      */
-    draw(p: p5, font: p5.Font, resources: UIDrawResources): void {
+    draw(p: p5, font: p5.Font, beat: number, bpm: number): void {
         const texture = this.renderTexture;
         if (!texture) {
             throw new Error("Texture not initialized");
@@ -219,12 +181,7 @@ export class UIManager {
         texture.push();
         texture.clear();
         const drawer = UIDRAWERS[this.activePatternIndex] ?? UIDRAWERS[0];
-        drawer({
-            p,
-            tex: texture,
-            font,
-            ...resources,
-        });
+        drawer(p, texture, font, beat, bpm);
 
         texture.pop();
     }

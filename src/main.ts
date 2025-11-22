@@ -24,7 +24,7 @@ const sketch = (p: p5) => {
   p.setup = async () => {
     const canvas = p.createCanvas(p.windowWidth, p.windowHeight, p.WEBGL);
     p.noCursor(); // カーソルを非表示にする
-    p.pixelDensity(2); // 高解像度ディスプレイ対応
+    p.pixelDensity(1); // 高解像度ディスプレイ対応
     canvas.parent("canvas-container");
 
     // 各マネージャーの初期化
@@ -71,17 +71,7 @@ const sketch = (p: p5) => {
     // UIの更新と描画
     uiManager.update(p, texManager.getParamsRow(7));
     const paramsRows = Array.from({ length: 8 }, (_, idx) => texManager.getParamsRow(idx));
-    uiManager.draw(p, font, {
-      texManager,
-      bandManager: texManager.getBandManager(),
-      effectManager,
-      captureTexture,
-      bpm: texManager.getBPM(),
-      beat: texManager.getBeat(),
-      paramsRows,
-      colorPalette: texManager.getColorPalette(),
-      colorPaletteRGB: texManager.getColorPaletteRGB(),
-    });
+    uiManager.draw(p, font, texManager.getBeat(), texManager.getBPM());
 
     // ポストエフェクトの適用と画面への描画
     effectManager.apply(p, texManager.getTexture(), uiManager.getTexture(), captureTexture, texManager.sceneMatrix.faderValues, texManager.getParamsRow(6), texManager.getBeat(), texManager.getColorPaletteRGB());

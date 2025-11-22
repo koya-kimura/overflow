@@ -41,11 +41,11 @@ export class NumberDisplayController {
         switch (this.settings.valueType) {
             case "one":
                 // 単純にビートの整数部分を10で割った余りを表示（0-9のカウントアップ）
-                return Math.floor(beat) % 10;
+                return Math.floor(beat + 0.5) % 10;
             case "two": {
                 // 偶数行と奇数行で異なる数値を表示（5ずらす）
-                const base = Math.floor(beat) % 10;
-                const shifted = (Math.floor(beat) + 5) % 10;
+                const base = Math.floor(beat + 0.5) % 10;
+                const shifted = (Math.floor(beat + 0.5) + 5) % 10;
                 return lineIndex % 2 === 0 ? base : shifted;
             }
             case "date":
@@ -56,13 +56,13 @@ export class NumberDisplayController {
                 return this.digitFromText(DateText.getHHMMSS(), lineIndex);
             case "sequence":
                 // 行インデックスとビートを組み合わせて、波打つような数列を生成
-                return (lineIndex + Math.floor(beat)) % 10;
+                return (lineIndex + Math.floor(beat + 0.5)) % 10;
             case "random":
                 // ビートと行インデックスをシードとして、決定論的なランダム値を生成
-                return Math.floor(UniformRandom.rand(Math.floor(beat), lineIndex) * 10);
+                return Math.floor(UniformRandom.rand(Math.floor(beat + 0.5), lineIndex) * 10);
             case "beat":
                 // ビート数を8桁の文字列として扱い、対応する桁を表示
-                return this.digitFromText(Math.floor(beat).toString().padStart(8, "0"), lineIndex);
+                return this.digitFromText(Math.floor(beat + 0.5).toString().padStart(8, "0"), lineIndex);
             default:
                 return 0;
         }

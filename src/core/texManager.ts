@@ -48,7 +48,7 @@ export class TexManager {
         this.sceneMatrix.setMaxOptionsForScene(4, [0, 0, 0, 0, 0, 0, 0, 0]);
         this.sceneMatrix.setMaxOptionsForScene(5, [0, 0, 0, 0, 0, 0, 0, 0]);
         this.sceneMatrix.setMaxOptionsForScene(6, [3, 5, 0, 0, 0, 0, 0, 0]);
-        this.sceneMatrix.setMaxOptionsForScene(7, [2, 0, 0, 0, 0, 0, 0, 0]);
+        this.sceneMatrix.setMaxOptionsForScene(7, [0, 0, 0, 0, 0, 0, 0, 0]);
     }
 
     /**

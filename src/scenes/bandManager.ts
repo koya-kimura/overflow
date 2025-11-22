@@ -135,6 +135,17 @@ export class BandManager {
             );
 
             this.drawBandForLine(p, tex, baseBox, i, beat);
+        }
+
+        for (let i = 0; i < this.lineCount; i++) {
+            const baseBox = this.createSegmentBoxForLine(
+                p,
+                i,
+                topLeftScaleX,
+                topRightScaleX,
+                bottomLeftScaleX,
+                bottomRightScaleX,
+            );
             this.drawNumberDisplay(p, tex, baseBox, i, beat, displayController);
         }
     }
