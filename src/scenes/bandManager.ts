@@ -4,8 +4,15 @@ import { ColorPalette } from "../utils/colorPalette";
 import { UniformRandom } from "../utils/uniformRandom";
 import { GVM } from "../utils/gvm";
 import { Easing } from "../utils/easing";
-import { DateText } from "../utils/dateText";
 import { SevenSegmentDigit } from "./components/SevenSegmentDisplay";
+import {
+    NumberDisplayController,
+    type NumberArrangeType,
+    type NumberMoveType,
+    type NumberMovingType,
+    type NumberRotateType,
+    type NumberValueType,
+} from "./components/NumberDisplayController";
 import {
     calculateSegmentBox,
     translateBox,
@@ -18,8 +25,6 @@ import {
 type DrawMode = "none" | "all" | "sequence" | "random" | "speedSeqence" | "highSpeedSeqence";
 // type numberValueType = "one" | "two" | "date" | "time" |"sequence" | "random" | "beat";
 
-type Point = { x: number; y: number };
-
 type BandParameterSet = {
     mode: DrawMode;
     lineCount: number;
@@ -30,11 +35,11 @@ type BandParameterSet = {
 
 type NumberParameterSet = {
     numberActiveType: DrawMode;
-    numberValueType: string;
-    numberMoveType: string;
-    numberArrangeType: string;
-    numberMovingType: string;
-    numberRotateType: string;
+    numberValueType: NumberValueType;
+    numberMoveType: NumberMoveType;
+    numberArrangeType: NumberArrangeType;
+    numberMovingType: NumberMovingType;
+    numberRotateType: NumberRotateType;
 };
 
 type ResolvedParameters = {
@@ -52,11 +57,11 @@ export class bandManager implements Scene {
 
     private numberActiveType: DrawMode = "none";
     private numberDisplays: SevenSegmentDigit[] = [];
-    private numberValueType = "one";
-    private numberMoveType: string = "none";
-    private numberArrangeType: string = "simple";
-    private numberMovingType: string = "none";
-    private numberRotateType: string = "none";
+    private numberValueType: NumberValueType = "one";
+    private numberMoveType: NumberMoveType = "none";
+    private numberArrangeType: NumberArrangeType = "simple";
+    private numberMovingType: NumberMovingType = "none";
+    private numberRotateType: NumberRotateType = "none";
 
     private colorPalette: string[] = ColorPalette.colors;
 
@@ -153,7 +158,16 @@ export class bandManager implements Scene {
 
     private drawNumberDisplay(_p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
         const numberDisplay = this.numberDisplays[lineIndex];
-        numberDisplay.setNumber(this.resolveNumberValue(lineIndex, beat));
+        const displayController = new NumberDisplayController({
+            valueType: this.numberValueType,
+            moveType: this.numberMoveType,
+            arrangeType: this.numberArrangeType,
+            movingType: this.numberMovingType,
+            rotateType: this.numberRotateType,
+            lineCount: this.lineCount,
+        });
+
+        numberDisplay.setNumber(displayController.resolveNumberValue(lineIndex, beat));
 
         if (!this.shouldDraw(this.numberActiveType, lineIndex, beat, this.lineCount)) {
             return;
@@ -175,7 +189,7 @@ export class bandManager implements Scene {
                 align,
             });
             const segmentCenter = computePolygonCenter(vertices);
-            const targetPositionCenter = this.resolveTargetPositionCenter(
+            const targetPositionCenter = displayController.resolveTargetPositionCenter(
                 _p,
                 segmentCenter,
                 segmentId,
@@ -184,12 +198,12 @@ export class bandManager implements Scene {
                 beat,
             );
 
-            const moving = this.resolveMovingScale(_p, beat);
+            const moving = displayController.resolveMovingScale(_p, beat);
             const xOffset = (targetPositionCenter.x - segmentCenter.x) * moving;
             const yOffset = (targetPositionCenter.y - segmentCenter.y) * moving;
 
-            const yMoveOffset = this.resolveNumberMoveOffset(_p, beat, lineIndex);
-            const rotationAngle = this.resolveRotationAngle(_p, beat, segmentId);
+            const yMoveOffset = displayController.resolveNumberMoveOffset(_p, beat, lineIndex);
+            const rotationAngle = displayController.resolveRotationAngle(_p, beat, segmentId);
             const translatedBox = translateBox(baseBox, xOffset);
             const normalizedYOffset = (yOffset + yMoveOffset) / tex.height;
 
@@ -210,135 +224,6 @@ export class bandManager implements Scene {
                 rotationAngle,
             });
         });
-    }
-
-    private resolveNumberValue(lineIndex: number, beat: number): number {
-        switch (this.numberValueType) {
-            case "one":
-                return Math.floor(beat) % 10;
-            case "two": {
-                const base = Math.floor(beat) % 10;
-                const shifted = (Math.floor(beat) + 5) % 10;
-                return lineIndex % 2 === 0 ? base : shifted;
-            }
-            case "date":
-                return this.digitFromText(DateText.getYYYYMMDD(), lineIndex);
-            case "time":
-                return this.digitFromText(DateText.getHHMMSS(), lineIndex);
-            case "sequence":
-                return (lineIndex + Math.floor(beat)) % 10;
-            case "random":
-                return Math.floor(UniformRandom.rand(Math.floor(beat), lineIndex) * 10);
-            case "beat":
-                return this.digitFromText(Math.floor(beat).toString().padStart(8, "0"), lineIndex);
-            default:
-                return 0;
-        }
-    }
-
-    private digitFromText(text: string, index: number): number {
-        if (text.length === 0) {
-            return 0;
-        }
-        const normalizedIndex = index % text.length;
-        const safeIndex = normalizedIndex < 0 ? normalizedIndex + text.length : normalizedIndex;
-        const char = text[safeIndex];
-        const digit = Number.parseInt(char, 10);
-        return Number.isNaN(digit) ? 0 : digit;
-    }
-
-    private resolveTargetPositionCenter(
-        _p: p5,
-        segmentCenter: Point,
-        segmentId: number,
-        segmentCount: number,
-        baseSeed: number,
-        beat: number,
-    ): Point {
-        const safeSegmentCount = Math.max(segmentCount, 1);
-
-        switch (this.numberArrangeType) {
-            case "center":
-                return { x: _p.width * 0.5, y: _p.height * 0.5 };
-            case "horizontal":
-                return {
-                    x: _p.width * (segmentId + 1) / (safeSegmentCount + 1),
-                    y: _p.height * 0.5,
-                };
-            case "vertical":
-                return {
-                    x: _p.width * 0.5,
-                    y: _p.height * (segmentId + 1) / (safeSegmentCount + 1),
-                };
-            case "grid": {
-                const gridSize = Math.ceil(Math.sqrt(safeSegmentCount));
-                const column = segmentId % gridSize;
-                const row = Math.floor(segmentId / gridSize);
-                return {
-                    x: _p.width * (column + 1) / (gridSize + 1),
-                    y: _p.height * (row + 1) / (gridSize + 1),
-                };
-            }
-            case "circle": {
-                const angle = (segmentId / safeSegmentCount) * Math.PI * 2 + beat * 0.5;
-                return {
-                    x: _p.width * 0.5 + Math.cos(angle) * (_p.width * 0.25),
-                    y: _p.height * 0.5 + Math.sin(angle) * (_p.height * 0.25),
-                };
-            }
-            case "random":
-                return {
-                    x: UniformRandom.rand(baseSeed, 1, Math.floor(beat * 0.5)) * _p.width,
-                    y: UniformRandom.rand(baseSeed, 2, Math.floor(beat * 0.5)) * _p.height,
-                };
-            case "simple":
-            default:
-                return segmentCenter;
-        }
-    }
-
-    private resolveMovingScale(_p: p5, beat: number): number {
-        switch (this.numberMovingType) {
-            case "zigzag":
-                return Math.abs((beat % 2.0) - 1.0);
-            case "ramp":
-                return Easing.easeInOutQuad(_p.fract(beat));
-            case "period":
-                return GVM.leapRamp(beat, 4, 1, Easing.easeInOutQuad);
-            case "none":
-            default:
-                return 1.0;
-        }
-    }
-
-    private resolveNumberMoveOffset(_p: p5, beat: number, lineIndex: number): number {
-        switch (this.numberMoveType) {
-            case "down":
-                return ((Easing.easeOutQuad((_p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (_p.height * 1.25);
-            case "wave":
-                return Math.sin((beat + lineIndex) * Math.PI * 0.5) * 50;
-            case "sequence":
-                return (Math.floor(beat / this.lineCount) % 2 === 0 ? -1 : 1) *
-                    (Math.floor(beat) % this.lineCount === lineIndex ? (beat % 1.0) : 0) *
-                    (_p.height * 1.25);
-            case "none":
-            default:
-                return 0;
-        }
-    }
-
-    private resolveRotationAngle(_p: p5, beat: number, segmentId: number): number {
-        switch (this.numberRotateType) {
-            case "lap":
-                return Easing.easeInOutSine(_p.fract(beat / 4)) * Math.PI * 2;
-            case "shake":
-                return Easing.zigzag(beat) * Math.PI / 10;
-            case "period":
-                return GVM.leapNoise(beat, 4, 1, Easing.easeInOutSine, segmentId) * Math.PI * 2;
-            case "none":
-            default:
-                return 0;
-        }
     }
 
     private resolveParameters(
@@ -379,11 +264,11 @@ export class bandManager implements Scene {
             { top: easeZigzag1, bottom: 0.5 },
             { top: 0.5, bottom: noiseVal },
         ];
-        const numberValueTypeOptions = ["one", "two", "date", "time", "sequence", "random", "beat"];
-        const numberMoveTypeOptions = ["none", "down", "wave", "sequence"];
-        const numberArrangeTypeOptions = ["simple", "center", "horizontal", "vertical", "grid", "circle", "random"];
-        const numberMovingTypeOptions = ["none", "zigzag", "ramp", "period"];
-        const numberRotateTypeOptions = ["none", "lap", "shake", "period"];
+        const numberValueTypeOptions: NumberValueType[] = ["one", "two", "date", "time", "sequence", "random", "beat"];
+        const numberMoveTypeOptions: NumberMoveType[] = ["none", "down", "wave", "sequence"];
+        const numberArrangeTypeOptions: NumberArrangeType[] = ["simple", "center", "horizontal", "vertical", "grid", "circle", "random"];
+        const numberMovingTypeOptions: NumberMovingType[] = ["none", "zigzag", "ramp", "period"];
+        const numberRotateTypeOptions: NumberRotateType[] = ["none", "lap", "shake", "period"];
 
         const bandParameters: BandParameterSet = {
             mode: modeOptions[bandParamValues[0]] ?? "none",

@@ -108,6 +108,8 @@
 - 今後の分離（ParameterResolver など）に備え、戻り値としてバンド設定・数字設定を明示的に切り分け。
 - `draw` 内の1行処理を `createSegmentBoxForLine` / `drawBandForLine` / `drawNumberDisplay` に段階抽出し、既存描画振る舞いを維持したまま責務を整理。
 - `drawNumberDisplay` の値決定・配置・移動/回転計算を `resolveNumberValue` などのヘルパー群へ整理し、1 メソッド内のネストを緩和しつつ描画結果を維持。
+- 数値関連パラメータに対して `NumberValueType` などのリテラル型を導入し、`resolveParameters` のオプション配列も明示的に型付けしてミスアサインを防止。
+- 数値表示ロジックを `NumberDisplayController` クラスとして `src/scenes/components/NumberDisplayController.ts` へ切り出し、`bandManager` からは生成したコントローラを呼び出すだけに整備。値決定や配置・モーションの分岐は新クラス側で担保。
 
 ### UIManager 型整備（2025-11-22）
 
