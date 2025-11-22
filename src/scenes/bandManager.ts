@@ -64,16 +64,18 @@ export class bandManager implements Scene {
     private numberRotateType: NumberRotateType = "none";
 
     private colorPalette: string[] = ColorPalette.colors;
+    private numberDisplayController: NumberDisplayController | null = null;
 
-    update(_p: p5, beat: number, bandParamValues: number[], NumberParamValues: number[], colorPalette: string[]): void {
-        const resolved = this.resolveParameters(_p, beat, bandParamValues, NumberParamValues, colorPalette);
+    update(p: p5, beat: number, bandParams: number[], numberParams: number[], colorPalette: string[]): void {
+        const resolved = this.resolveParameters(p, beat, bandParams, numberParams, colorPalette);
         this.applyBandParameters(resolved.band);
         this.applyNumberParameters(resolved.number);
         this.colorPalette = resolved.colorPalette;
     }
 
-    draw(_p: p5, tex: p5.Graphics, beat: number): void {
+    draw(p: p5, tex: p5.Graphics, beat: number): void {
         this.ensureNumberDisplayCount(this.lineCount);
+        const displayController = this.ensureNumberDisplayController();
 
         const topLeftScaleX = this.topBotomCenterScaleX.top - this.topBottomWidthScaleX.top * 0.5;
         const topRightScaleX = this.topBotomCenterScaleX.top + this.topBottomWidthScaleX.top * 0.5;
@@ -82,7 +84,7 @@ export class bandManager implements Scene {
 
         for (let i = 0; i < this.lineCount; i++) {
             const baseBox = this.createSegmentBoxForLine(
-                _p,
+                p,
                 i,
                 topLeftScaleX,
                 topRightScaleX,
@@ -90,8 +92,8 @@ export class bandManager implements Scene {
                 bottomRightScaleX,
             );
 
-            this.drawBandForLine(_p, tex, baseBox, i, beat);
-            this.drawNumberDisplay(_p, tex, baseBox, i, beat);
+            this.drawBandForLine(p, tex, baseBox, i, beat);
+            this.drawNumberDisplay(p, tex, baseBox, i, beat, displayController);
         }
     }
 
@@ -117,7 +119,7 @@ export class bandManager implements Scene {
     }
 
     private createSegmentBoxForLine(
-        _p: p5,
+        p: p5,
         lineIndex: number,
         topLeftScaleX: number,
         topRightScaleX: number,
@@ -125,7 +127,7 @@ export class bandManager implements Scene {
         bottomRightScaleX: number,
     ): BoxCoordinates {
         return calculateSegmentBox({
-            p: _p,
+            p,
             count: this.lineCount,
             startTopIndex: lineIndex,
             endTopIndex: lineIndex,
@@ -139,7 +141,7 @@ export class bandManager implements Scene {
         });
     }
 
-    private drawBandForLine(_p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
+    private drawBandForLine(p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
         tex.noStroke();
         tex.fill(this.colorPalette[lineIndex % this.colorPalette.length]);
 
@@ -148,7 +150,7 @@ export class bandManager implements Scene {
         }
 
         drawTrapezoidBand({
-            p: _p,
+            p,
             tex,
             box: baseBox,
             yscl1: 0.5 - this.bandWidthHeightScale.height * 0.5,
@@ -156,17 +158,15 @@ export class bandManager implements Scene {
         });
     }
 
-    private drawNumberDisplay(_p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
+    private drawNumberDisplay(
+        p: p5,
+        tex: p5.Graphics,
+        baseBox: BoxCoordinates,
+        lineIndex: number,
+        beat: number,
+        displayController: NumberDisplayController,
+    ): void {
         const numberDisplay = this.numberDisplays[lineIndex];
-        const displayController = new NumberDisplayController({
-            valueType: this.numberValueType,
-            moveType: this.numberMoveType,
-            arrangeType: this.numberArrangeType,
-            movingType: this.numberMovingType,
-            rotateType: this.numberRotateType,
-            lineCount: this.lineCount,
-        });
-
         numberDisplay.setNumber(displayController.resolveNumberValue(lineIndex, beat));
 
         if (!this.shouldDraw(this.numberActiveType, lineIndex, beat, this.lineCount)) {
@@ -180,7 +180,7 @@ export class bandManager implements Scene {
             const baseSeed = (lineIndex + 1) * 1000 + (segmentId + 1);
 
             const vertices = resolveTrapezoidVertices({
-                p: _p,
+                p,
                 box: baseBox,
                 texHeight: tex.height,
                 yscl1,
@@ -190,7 +190,7 @@ export class bandManager implements Scene {
             });
             const segmentCenter = computePolygonCenter(vertices);
             const targetPositionCenter = displayController.resolveTargetPositionCenter(
-                _p,
+                p,
                 segmentCenter,
                 segmentId,
                 segmentCount,
@@ -198,12 +198,12 @@ export class bandManager implements Scene {
                 beat,
             );
 
-            const moving = displayController.resolveMovingScale(_p, beat);
+            const moving = displayController.resolveMovingScale(p, beat);
             const xOffset = (targetPositionCenter.x - segmentCenter.x) * moving;
             const yOffset = (targetPositionCenter.y - segmentCenter.y) * moving;
 
-            const yMoveOffset = displayController.resolveNumberMoveOffset(_p, beat, lineIndex);
-            const rotationAngle = displayController.resolveRotationAngle(_p, beat, segmentId);
+            const yMoveOffset = displayController.resolveNumberMoveOffset(p, beat, lineIndex);
+            const rotationAngle = displayController.resolveRotationAngle(p, beat, segmentId);
             const translatedBox = translateBox(baseBox, xOffset);
             const normalizedYOffset = (yOffset + yMoveOffset) / tex.height;
 
@@ -214,7 +214,7 @@ export class bandManager implements Scene {
             const newY2 = targetCenter + halfSpan;
 
             drawTrapezoidBand({
-                p: _p,
+                p,
                 tex,
                 box: translatedBox,
                 yscl1: newY1,
@@ -227,10 +227,10 @@ export class bandManager implements Scene {
     }
 
     private resolveParameters(
-        _p: p5,
+        p: p5,
         beat: number,
-        bandParamValues: number[],
-        numberParamValues: number[],
+        bandParams: number[],
+        numberParams: number[],
         colorPalette: string[],
     ): ResolvedParameters {
         const zigzag = Math.abs(beat % 2 - 1.0);
@@ -239,13 +239,13 @@ export class bandManager implements Scene {
         const easeZigzag2 = Easing.easeInOutQuint(zigzag);
 
         const bandWidthHeightScaleOptions = [
-            { width: 0.3, height: 0.3 * _p.width / _p.height },
+            { width: 0.3, height: 0.3 * p.width / p.height },
             { width: 0.1, height: 1.0 },
             { width: 0.5, height: 1.0 },
             { width: 1.0, height: 0.5 },
             { width: 0.5, height: 0.5 },
             { width: 1.0, height: 1.0 },
-            { width: easeZigzag1, height: 0.5 + _p.map(easeZigzag2, 0, 1, -0.05, 0.05) },
+            { width: easeZigzag1, height: 0.5 + p.map(easeZigzag2, 0, 1, -0.05, 0.05) },
         ];
         const countOptions = [1.0, 2.0, 4.0, 8.0, 16.0];
         const modeOptions: DrawMode[] = ["none", "all", "sequence", "random", "speedSeqence", "highSpeedSeqence"];
@@ -271,20 +271,20 @@ export class bandManager implements Scene {
         const numberRotateTypeOptions: NumberRotateType[] = ["none", "lap", "shake", "period"];
 
         const bandParameters: BandParameterSet = {
-            mode: modeOptions[bandParamValues[0]] ?? "none",
-            lineCount: countOptions[bandParamValues[1]] ?? 1.0,
-            bandWidthHeightScale: bandWidthHeightScaleOptions[bandParamValues[2]] ?? { width: 1.0, height: 1.0 },
-            topBottomWidthScaleX: topBottomWidthOptions[bandParamValues[3]] ?? { top: 1.0, bottom: 1.0 },
-            topBotomCenterScaleX: centerOptions[bandParamValues[4]] ?? { top: 0.5, bottom: 0.5 },
+            mode: modeOptions[bandParams[0]] ?? "none",
+            lineCount: countOptions[bandParams[1]] ?? 1.0,
+            bandWidthHeightScale: bandWidthHeightScaleOptions[bandParams[2]] ?? { width: 1.0, height: 1.0 },
+            topBottomWidthScaleX: topBottomWidthOptions[bandParams[3]] ?? { top: 1.0, bottom: 1.0 },
+            topBotomCenterScaleX: centerOptions[bandParams[4]] ?? { top: 0.5, bottom: 0.5 },
         };
 
         const numberParameters: NumberParameterSet = {
-            numberActiveType: modeOptions[numberParamValues[0]] ?? "none",
-            numberValueType: numberValueTypeOptions[numberParamValues[1]] ?? "one",
-            numberMoveType: numberMoveTypeOptions[numberParamValues[2]] ?? "none",
-            numberArrangeType: numberArrangeTypeOptions[numberParamValues[3]] ?? "simple",
-            numberMovingType: numberMovingTypeOptions[numberParamValues[4]] ?? "none",
-            numberRotateType: numberRotateTypeOptions[numberParamValues[5]] ?? "none",
+            numberActiveType: modeOptions[numberParams[0]] ?? "none",
+            numberValueType: numberValueTypeOptions[numberParams[1]] ?? "one",
+            numberMoveType: numberMoveTypeOptions[numberParams[2]] ?? "none",
+            numberArrangeType: numberArrangeTypeOptions[numberParams[3]] ?? "simple",
+            numberMovingType: numberMovingTypeOptions[numberParams[4]] ?? "none",
+            numberRotateType: numberRotateTypeOptions[numberParams[5]] ?? "none",
         };
 
         return {
@@ -300,6 +300,7 @@ export class bandManager implements Scene {
         this.bandWidthHeightScale = band.bandWidthHeightScale;
         this.topBottomWidthScaleX = band.topBottomWidthScaleX;
         this.topBotomCenterScaleX = band.topBotomCenterScaleX;
+        this.numberDisplayController = null;
     }
 
     private applyNumberParameters(number: NumberParameterSet): void {
@@ -309,5 +310,22 @@ export class bandManager implements Scene {
         this.numberArrangeType = number.numberArrangeType;
         this.numberMovingType = number.numberMovingType;
         this.numberRotateType = number.numberRotateType;
+        this.numberDisplayController = null;
+    }
+
+    private ensureNumberDisplayController(): NumberDisplayController {
+        this.numberDisplayController ??= this.createNumberDisplayController();
+        return this.numberDisplayController;
+    }
+
+    private createNumberDisplayController(): NumberDisplayController {
+        return new NumberDisplayController({
+            valueType: this.numberValueType,
+            moveType: this.numberMoveType,
+            arrangeType: this.numberArrangeType,
+            movingType: this.numberMovingType,
+            rotateType: this.numberRotateType,
+            lineCount: this.lineCount,
+        });
     }
 }

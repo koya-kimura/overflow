@@ -53,7 +53,7 @@ export class NumberDisplayController {
     }
 
     resolveTargetPositionCenter(
-        _p: p5,
+        p: p5,
         segmentCenter: Point,
         segmentId: number,
         segmentCount: number,
@@ -64,37 +64,37 @@ export class NumberDisplayController {
 
         switch (this.settings.arrangeType) {
             case "center":
-                return { x: _p.width * 0.5, y: _p.height * 0.5 };
+                return { x: p.width * 0.5, y: p.height * 0.5 };
             case "horizontal":
                 return {
-                    x: _p.width * (segmentId + 1) / (safeSegmentCount + 1),
-                    y: _p.height * 0.5,
+                    x: p.width * (segmentId + 1) / (safeSegmentCount + 1),
+                    y: p.height * 0.5,
                 };
             case "vertical":
                 return {
-                    x: _p.width * 0.5,
-                    y: _p.height * (segmentId + 1) / (safeSegmentCount + 1),
+                    x: p.width * 0.5,
+                    y: p.height * (segmentId + 1) / (safeSegmentCount + 1),
                 };
             case "grid": {
                 const gridSize = Math.ceil(Math.sqrt(safeSegmentCount));
                 const column = segmentId % gridSize;
                 const row = Math.floor(segmentId / gridSize);
                 return {
-                    x: _p.width * (column + 1) / (gridSize + 1),
-                    y: _p.height * (row + 1) / (gridSize + 1),
+                    x: p.width * (column + 1) / (gridSize + 1),
+                    y: p.height * (row + 1) / (gridSize + 1),
                 };
             }
             case "circle": {
                 const angle = (segmentId / safeSegmentCount) * Math.PI * 2 + beat * 0.5;
                 return {
-                    x: _p.width * 0.5 + Math.cos(angle) * (_p.width * 0.25),
-                    y: _p.height * 0.5 + Math.sin(angle) * (_p.height * 0.25),
+                    x: p.width * 0.5 + Math.cos(angle) * (p.width * 0.25),
+                    y: p.height * 0.5 + Math.sin(angle) * (p.height * 0.25),
                 };
             }
             case "random":
                 return {
-                    x: UniformRandom.rand(baseSeed, 1, Math.floor(beat * 0.5)) * _p.width,
-                    y: UniformRandom.rand(baseSeed, 2, Math.floor(beat * 0.5)) * _p.height,
+                    x: UniformRandom.rand(baseSeed, 1, Math.floor(beat * 0.5)) * p.width,
+                    y: UniformRandom.rand(baseSeed, 2, Math.floor(beat * 0.5)) * p.height,
                 };
             case "simple":
             default:
@@ -102,12 +102,12 @@ export class NumberDisplayController {
         }
     }
 
-    resolveMovingScale(_p: p5, beat: number): number {
+    resolveMovingScale(p: p5, beat: number): number {
         switch (this.settings.movingType) {
             case "zigzag":
                 return Math.abs((beat % 2.0) - 1.0);
             case "ramp":
-                return Easing.easeInOutQuad(_p.fract(beat));
+                return Easing.easeInOutQuad(p.fract(beat));
             case "period":
                 return GVM.leapRamp(beat, 4, 1, Easing.easeInOutQuad);
             case "none":
@@ -116,26 +116,26 @@ export class NumberDisplayController {
         }
     }
 
-    resolveNumberMoveOffset(_p: p5, beat: number, lineIndex: number): number {
+    resolveNumberMoveOffset(p: p5, beat: number, lineIndex: number): number {
         switch (this.settings.moveType) {
             case "down":
-                return ((Easing.easeOutQuad((_p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (_p.height * 1.25);
+                return ((Easing.easeOutQuad((p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (p.height * 1.25);
             case "wave":
                 return Math.sin((beat + lineIndex) * Math.PI * 0.5) * 50;
             case "sequence":
                 return (Math.floor(beat / this.settings.lineCount) % 2 === 0 ? -1 : 1) *
                     (Math.floor(beat) % this.settings.lineCount === lineIndex ? (beat % 1.0) : 0) *
-                    (_p.height * 1.25);
+                    (p.height * 1.25);
             case "none":
             default:
                 return 0;
         }
     }
 
-    resolveRotationAngle(_p: p5, beat: number, segmentId: number): number {
+    resolveRotationAngle(p: p5, beat: number, segmentId: number): number {
         switch (this.settings.rotateType) {
             case "lap":
-                return Easing.easeInOutSine(_p.fract(beat / 4)) * Math.PI * 2;
+                return Easing.easeInOutSine(p.fract(beat / 4)) * Math.PI * 2;
             case "shake":
                 return Easing.zigzag(beat) * Math.PI / 10;
             case "period":

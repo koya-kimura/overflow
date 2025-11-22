@@ -110,6 +110,10 @@
 - `drawNumberDisplay` の値決定・配置・移動/回転計算を `resolveNumberValue` などのヘルパー群へ整理し、1 メソッド内のネストを緩和しつつ描画結果を維持。
 - 数値関連パラメータに対して `NumberValueType` などのリテラル型を導入し、`resolveParameters` のオプション配列も明示的に型付けしてミスアサインを防止。
 - 数値表示ロジックを `NumberDisplayController` クラスとして `src/scenes/components/NumberDisplayController.ts` へ切り出し、`bandManager` からは生成したコントローラを呼び出すだけに整備。値決定や配置・モーションの分岐は新クラス側で担保。
+- `bandManager` はパラメータ更新時にキャッシュを無効化し、描画ループで初アクセス時にコントローラを生成・再利用する遅延初期化フローへ変更し、無駄なインスタンス生成を抑制。
+- `draw` では 1 フレームにつき 1 度だけコントローラを取得し、`drawNumberDisplay` に引き渡す構造に変更してループ内の `ensure` 呼び出しを解消。
+- p5 インスタンスは `p`、意図的に未使用の引数は先頭 `_`、それ以外はキャメルケースを基準とするネーミング方針を確立。
+- Scene インターフェースを `update(p, beat, bandParams, numberParams, colorPalette)` / `draw(p, target, beat)` の明示契約に更新し、`bandManager` と `TexManager` を新シグネチャへ追従。
 
 ### UIManager 型整備（2025-11-22）
 

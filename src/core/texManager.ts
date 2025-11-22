@@ -70,8 +70,13 @@ export class TexManager {
         texture.push();
         texture.clear();
 
-        this.bandManager.update(p, this.bpmManager.getBeat(), this.sceneMatrix.getParamValues(0), this.sceneMatrix.getParamValues(1), this.getColorPalette());
-        this.bandManager.draw(p, texture, this.bpmManager.getBeat());
+        const beat = this.bpmManager.getBeat();
+        const bandParams = this.sceneMatrix.getParamValues(0);
+        const numberParams = this.sceneMatrix.getParamValues(1);
+        const palette = this.getColorPalette();
+
+        this.bandManager.update(p, beat, bandParams, numberParams, palette);
+        this.bandManager.draw(p, texture, beat);
         texture.pop();
 
         // this.sceneMatrix.drawDebug(p, texture, 24, 24);
