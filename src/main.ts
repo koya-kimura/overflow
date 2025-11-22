@@ -70,7 +70,6 @@ const sketch = (p: p5) => {
 
     // UIの更新と描画
     uiManager.update(p, texManager.getParamsRow(7));
-    const paramsRows = Array.from({ length: 8 }, (_, idx) => texManager.getParamsRow(idx));
     uiManager.draw(p, font, texManager.getBeat(), texManager.getBPM());
 
     // ポストエフェクトの適用と画面への描画
