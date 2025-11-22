@@ -44,10 +44,13 @@
   - `handleFaderControlChange`
 - データバイトの命名を `statusByte`, `noteNumber`, `velocity` 等へリネームし、コメントを削減。
 
-### フェーズ 3: LED 出力パイプライン（進行中）
+### フェーズ 3: LED 出力パイプライン（完了）
 - `midiOutputSendControls` をセクションごとに private メソッド化。（完了）
 - LED カラー定数を `LED_COLORS` へ整理し、用途別に命名を調整。（完了）
-- 送信処理を `sendNoteOn` ヘルパーに集約。（未着手）
+- 送信処理を `sendNoteOn` ヘルパーに集約。（完了）
+
+#### メモ（2025-11-22 更新）
+- maxOptions=0 を許容し、該当列の MIDI 入力・LED 表示をすべて OFF にするガードを追加済み。ランダムシーンモード関連の未使用処理は削除済み。
 
 ### フェーズ 4: ランダムフェーダー
 - `FaderRandomState` 管理を専用クラス（例: `RandomFaderController`）へ切り出し。

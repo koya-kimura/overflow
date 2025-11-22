@@ -137,6 +137,10 @@
 - `update`・フォールバック処理・ランダムフェーダー更新で util を利用するよう書き換え、`processRandomFaders` での時刻取得も共通化。
 - `handleMIDIMessage` を `handleShiftToggle` / `handleFaderButton` / `handleSideButton` / `handleGridPad` / `handleFaderControlChange` の分岐メソッドへ再構成し、可読性と今後の責務分離を容易にした。
 - `midiOutputSendControls` を `sendSceneButtonLeds` / `sendGridPadLeds` / `sendFaderButtonLeds` へ分割し、LED カラー定義を `LED_COLORS` へ整理して視認性と保守性を向上。
+- LED 送信処理を `sendNoteOn` ヘルパーへ集約し、LED 制御セクションの重複を削減。
+- `update` からランダム値更新ループを `updateRandomGridValues` に抽出し、キーボードフォールバック通知も専用メソッドで一元化して処理フローを短縮。
+- 未使用だったシーンランダム切替（Shift/F9/ランダムキー）処理を削除し、関連定数やメソッドを整理してコードをスリム化。
+- `setMaxOptionsForScene` で 0 を許容し、該当カラムの LED・入力・ランダム状態を OFF に保つよう調整。MIDI 入力・フォールバックとも maxOptions=0 の列では操作が効果を持たないよう統一。
 
 ### UIManager 型整備（2025-11-22）
 
