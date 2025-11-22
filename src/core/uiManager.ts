@@ -9,7 +9,7 @@ type UIDrawResources = {
     texManager: TexManager;
     bandManager: bandManager;
     effectManager: EffectManager;
-    captureTexture: p5.Graphics | null;
+    captureTexture: p5.Graphics | undefined;
     bpm: number;
     beat: number;
     paramsRows: number[][];
@@ -25,7 +25,7 @@ type UIDrawContext = UIDrawResources & {
 
 type UIDrawFunction = (context: UIDrawContext) => void;
 
-const UIDraw01: UIDrawFunction = ({ p, tex, font }) => {
+const UIDraw01: UIDrawFunction = ({ tex }) => {
     tex.clear();
     // UI表示なし
 };
@@ -100,11 +100,11 @@ const UIDRAWERS: readonly UIDrawFunction[] = [
 
 // UIManager は単純なテキストオーバーレイの描画を担当する。
 export class UIManager {
-    private renderTexture: p5.Graphics | null;
+    private renderTexture: p5.Graphics | undefined;
     private activePatternIndex: number;
 
     constructor() {
-        this.renderTexture = null;
+        this.renderTexture = undefined;
         this.activePatternIndex = 0;
     }
 

@@ -106,5 +106,12 @@
 - `bandManager.update` を `resolveParameters`（解決フェーズ）→ `applyBandParameters` / `applyNumberParameters`（適用フェーズ）に分割。
 - 既存のオプション配列やマッピングロジックは構造体にまとめ、描画挙動は変更せずに整理。
 - 今後の分離（ParameterResolver など）に備え、戻り値としてバンド設定・数字設定を明示的に切り分け。
+- `draw` 内の1行処理を `createSegmentBoxForLine` / `drawBandForLine` / `drawNumberDisplay` に段階抽出し、既存描画振る舞いを維持したまま責務を整理。
+
+### UIManager 型整備（2025-11-22）
+
+- `UIManager` 内部で `null` を使用していたレンダーテクスチャ参照を `undefined` ベースに更新。
+- `UIDrawResources.captureTexture` も `undefined` 併用想定の型注釈へ調整。
+- 未使用パラメータ警告を解消しつつ、描画挙動は従来どおり維持。
 
 > 次の観察ポイント: `Scene` 実装や `SevenSegmentDigit` などコンポーネント層の依存、および utils 内で未利用のモジュールがないか洗う。

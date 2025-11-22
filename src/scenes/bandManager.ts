@@ -12,6 +12,7 @@ import {
     drawTrapezoidBand,
     resolveTrapezoidVertices,
     computePolygonCenter,
+    type BoxCoordinates,
 } from "../utils/bandGeometry";
 
 type DrawMode = "none" | "all" | "sequence" | "random" | "speedSeqence" | "highSpeedSeqence";
@@ -73,121 +74,17 @@ export class bandManager implements Scene {
         const bottomRightScaleX = this.topBotomCenterScaleX.bottom + this.topBottomWidthScaleX.bottom * 0.5;
 
         for (let i = 0; i < this.lineCount; i++) {
-            const baseBox = calculateSegmentBox({
-                p: _p,
-                count: this.lineCount,
-                startTopIndex: i,
-                endTopIndex: i,
-                startBottomIndex: i,
-                endBottomIndex: i,
-                scale: this.bandWidthHeightScale.width,
-                xStartTop: topLeftScaleX,
-                xEndTop: topRightScaleX,
-                xStartBottom: bottomLeftScaleX,
-                xEndBottom: bottomRightScaleX,
-            });
+            const baseBox = this.createSegmentBoxForLine(
+                _p,
+                i,
+                topLeftScaleX,
+                topRightScaleX,
+                bottomLeftScaleX,
+                bottomRightScaleX,
+            );
 
-            tex.noStroke();
-            tex.fill(this.colorPalette[i % this.colorPalette.length]);
-
-            if (this.shouldDraw(this.mode, i, beat, this.lineCount)) {
-                drawTrapezoidBand({
-                    p: _p,
-                    tex,
-                    box: baseBox,
-                    yscl1: 0.5 - this.bandWidthHeightScale.height * 0.5,
-                    yscl2: 0.5 + this.bandWidthHeightScale.height * 0.5,
-                });
-            }
-
-            const numberDisplay = this.numberDisplays[i];
-            const numberValue = this.numberValueType === "one" ? (Math.floor(beat) % 10) :
-                this.numberValueType === "two" ? ( i % 2 == 0 ? (Math.floor(beat) % 10) : ((Math.floor(beat) + 5) % 10)) :
-                this.numberValueType === "date" ? [...DateText.getYYYYMMDD()][i % 8].charCodeAt(0) - '0'.charCodeAt(0) :
-                this.numberValueType === "time" ? [...DateText.getHHMMSS()][i % 8].charCodeAt(0) - '0'.charCodeAt(0) :
-                this.numberValueType === "sequence" ? ((i + Math.floor(beat)) % 10) :
-                this.numberValueType === "random" ? Math.floor(UniformRandom.rand(Math.floor(beat), i) * 10) :
-                this.numberValueType === "beat" ? [...Math.floor(beat).toString().padStart(8, '0')][i % 8].charCodeAt(0) - '0'.charCodeAt(0) :
-                0;
-            numberDisplay.setNumber(numberValue);
-
-            if (this.shouldDraw(this.numberActiveType, i, beat, this.lineCount)) {
-                tex.fill(255);
-
-                numberDisplay.draw((segmentId, yscl1, yscl2, xscl, align) => {
-                    const baseSeed = (i + 1) * 1000 + (segmentId + 1);
-
-                    const vertices = resolveTrapezoidVertices({
-                        p: _p,
-                        box: baseBox,
-                        texHeight: tex.height,
-                        yscl1,
-                        yscl2,
-                        xscl,
-                        align,
-                    });
-                    const segmentCenter = computePolygonCenter(vertices);
-                    const targetPositionCenter = this.numberArrangeType === "simple" ? segmentCenter :
-                        this.numberArrangeType === "center" ? { x: _p.width * 0.5, y: _p.height * 0.5 } :
-                        this.numberArrangeType === "horizontal" ? { x: _p.width * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1), y: _p.height * 0.5 } :
-                        this.numberArrangeType === "vertical" ? { x: _p.width * 0.5, y: _p.height * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1) } :
-                        this.numberArrangeType === "grid" ? {
-                            x: _p.width * ((segmentId % Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
-                            y: _p.height * (Math.floor(segmentId / Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
-                        } :
-                        this.numberArrangeType === "circle" ? {
-                            x: _p.width * 0.5 + Math.cos((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.width * 0.25),
-                            y: _p.height * 0.5 + Math.sin((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.height * 0.25),
-                        } :
-                        this.numberArrangeType === "random" ? {
-                            x: UniformRandom.rand(baseSeed , 1, Math.floor(beat * 0.5)) * _p.width,
-                            y: UniformRandom.rand(baseSeed , 2, Math.floor(beat * 0.5)) * _p.height,
-                        } :
-                        segmentCenter;
-                    
-                    const moving = this.numberMovingType === "none" ? 1.0 :
-                        this.numberMovingType === "zigzag" ? Math.abs((beat % 2.0) - 1.0) :
-                        this.numberMovingType === "ramp" ? Easing.easeInOutQuad(_p.fract(beat)) :
-                        this.numberMovingType === "period" ? GVM.leapRamp(beat, 4, 1, Easing.easeInOutQuad) :
-                        1.0;
-
-                    const xOffset = (targetPositionCenter.x - segmentCenter.x) * moving;
-                    const yOffset = (targetPositionCenter.y - segmentCenter.y) * moving;
-
-                    const yMoveOffset = 
-                        this.numberMoveType === "down" ? ((Easing.easeOutQuad((_p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (_p.height * 1.25) :
-                        this.numberMoveType === "wave" ? Math.sin((beat + i) * Math.PI * 0.5) * 50 :
-                        this.numberMoveType === "sequence" ? (Math.floor(beat / this.lineCount) % 2 === 0 ? -1 : 1) * (Math.floor(beat) % this.lineCount === i ? (beat % 1.0) : 0) * (_p.height * 1.25):
-                        0;
-
-
-                    const rotationAngle = this.numberRotateType === "none" ? 0 :
-                        this.numberRotateType === "lap" ? Easing.easeInOutSine( _p.fract(beat / 4) ) * Math.PI * 2 :
-                        this.numberRotateType === "shake" ? Easing.zigzag(beat) * Math.PI / 10:
-                        this.numberRotateType === "period" ? GVM.leapNoise(beat, 4, 1, Easing.easeInOutSine, segmentId) * Math.PI * 2:
-                        0;
-                    const translatedBox = translateBox(baseBox, xOffset);
-                    const normalizedYOffset = (yOffset + yMoveOffset) / tex.height;
-
-                    const span = yscl2 - yscl1;
-                    const halfSpan = span * 0.5;
-                    const targetCenter = (yscl1 + yscl2) * 0.5 + normalizedYOffset;
-                    // const clampedCenter = Math.min(Math.max(targetCenter, halfSpan), 1 - halfSpan);
-                    const newY1 = targetCenter - halfSpan;
-                    const newY2 = targetCenter + halfSpan;
-
-                    drawTrapezoidBand({
-                        p: _p,
-                        tex,
-                        box: translatedBox,
-                        yscl1: newY1,
-                        yscl2: newY2,
-                        xscl,
-                        align,
-                        rotationAngle,
-                    });
-                });
-            }
+            this.drawBandForLine(_p, tex, baseBox, i, beat);
+            this.drawNumberDisplay(_p, tex, baseBox, i, beat);
         }
     }
 
@@ -210,6 +107,137 @@ export class bandManager implements Scene {
             case "none": return false;
             default: return false;
         }
+    }
+
+    private createSegmentBoxForLine(
+        _p: p5,
+        lineIndex: number,
+        topLeftScaleX: number,
+        topRightScaleX: number,
+        bottomLeftScaleX: number,
+        bottomRightScaleX: number,
+    ): BoxCoordinates {
+        return calculateSegmentBox({
+            p: _p,
+            count: this.lineCount,
+            startTopIndex: lineIndex,
+            endTopIndex: lineIndex,
+            startBottomIndex: lineIndex,
+            endBottomIndex: lineIndex,
+            scale: this.bandWidthHeightScale.width,
+            xStartTop: topLeftScaleX,
+            xEndTop: topRightScaleX,
+            xStartBottom: bottomLeftScaleX,
+            xEndBottom: bottomRightScaleX,
+        });
+    }
+
+    private drawBandForLine(_p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
+        tex.noStroke();
+        tex.fill(this.colorPalette[lineIndex % this.colorPalette.length]);
+
+        if (!this.shouldDraw(this.mode, lineIndex, beat, this.lineCount)) {
+            return;
+        }
+
+        drawTrapezoidBand({
+            p: _p,
+            tex,
+            box: baseBox,
+            yscl1: 0.5 - this.bandWidthHeightScale.height * 0.5,
+            yscl2: 0.5 + this.bandWidthHeightScale.height * 0.5,
+        });
+    }
+
+    private drawNumberDisplay(_p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
+        const numberDisplay = this.numberDisplays[lineIndex];
+        const numberValue = this.numberValueType === "one" ? (Math.floor(beat) % 10) :
+            this.numberValueType === "two" ? (lineIndex % 2 === 0 ? (Math.floor(beat) % 10) : ((Math.floor(beat) + 5) % 10)) :
+            this.numberValueType === "date" ? [...DateText.getYYYYMMDD()][lineIndex % 8].charCodeAt(0) - "0".charCodeAt(0) :
+            this.numberValueType === "time" ? [...DateText.getHHMMSS()][lineIndex % 8].charCodeAt(0) - "0".charCodeAt(0) :
+            this.numberValueType === "sequence" ? ((lineIndex + Math.floor(beat)) % 10) :
+            this.numberValueType === "random" ? Math.floor(UniformRandom.rand(Math.floor(beat), lineIndex) * 10) :
+            this.numberValueType === "beat" ? [...Math.floor(beat).toString().padStart(8, "0")][lineIndex % 8].charCodeAt(0) - "0".charCodeAt(0) :
+            0;
+        numberDisplay.setNumber(numberValue);
+
+        if (!this.shouldDraw(this.numberActiveType, lineIndex, beat, this.lineCount)) {
+            return;
+        }
+
+        tex.fill(255);
+
+        numberDisplay.draw((segmentId, yscl1, yscl2, xscl, align) => {
+            const baseSeed = (lineIndex + 1) * 1000 + (segmentId + 1);
+
+            const vertices = resolveTrapezoidVertices({
+                p: _p,
+                box: baseBox,
+                texHeight: tex.height,
+                yscl1,
+                yscl2,
+                xscl,
+                align,
+            });
+            const segmentCenter = computePolygonCenter(vertices);
+            const targetPositionCenter = this.numberArrangeType === "simple" ? segmentCenter :
+                this.numberArrangeType === "center" ? { x: _p.width * 0.5, y: _p.height * 0.5 } :
+                this.numberArrangeType === "horizontal" ? { x: _p.width * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1), y: _p.height * 0.5 } :
+                this.numberArrangeType === "vertical" ? { x: _p.width * 0.5, y: _p.height * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1) } :
+                this.numberArrangeType === "grid" ? {
+                    x: _p.width * ((segmentId % Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
+                    y: _p.height * (Math.floor(segmentId / Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
+                } :
+                this.numberArrangeType === "circle" ? {
+                    x: _p.width * 0.5 + Math.cos((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.width * 0.25),
+                    y: _p.height * 0.5 + Math.sin((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.height * 0.25),
+                } :
+                this.numberArrangeType === "random" ? {
+                    x: UniformRandom.rand(baseSeed, 1, Math.floor(beat * 0.5)) * _p.width,
+                    y: UniformRandom.rand(baseSeed, 2, Math.floor(beat * 0.5)) * _p.height,
+                } :
+                segmentCenter;
+
+            const moving = this.numberMovingType === "none" ? 1.0 :
+                this.numberMovingType === "zigzag" ? Math.abs((beat % 2.0) - 1.0) :
+                this.numberMovingType === "ramp" ? Easing.easeInOutQuad(_p.fract(beat)) :
+                this.numberMovingType === "period" ? GVM.leapRamp(beat, 4, 1, Easing.easeInOutQuad) :
+                1.0;
+
+            const xOffset = (targetPositionCenter.x - segmentCenter.x) * moving;
+            const yOffset = (targetPositionCenter.y - segmentCenter.y) * moving;
+
+            const yMoveOffset =
+                this.numberMoveType === "down" ? ((Easing.easeOutQuad((_p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (_p.height * 1.25) :
+                this.numberMoveType === "wave" ? Math.sin((beat + lineIndex) * Math.PI * 0.5) * 50 :
+                this.numberMoveType === "sequence" ? (Math.floor(beat / this.lineCount) % 2 === 0 ? -1 : 1) * (Math.floor(beat) % this.lineCount === lineIndex ? (beat % 1.0) : 0) * (_p.height * 1.25) :
+                0;
+
+            const rotationAngle = this.numberRotateType === "none" ? 0 :
+                this.numberRotateType === "lap" ? Easing.easeInOutSine(_p.fract(beat / 4)) * Math.PI * 2 :
+                this.numberRotateType === "shake" ? Easing.zigzag(beat) * Math.PI / 10 :
+                this.numberRotateType === "period" ? GVM.leapNoise(beat, 4, 1, Easing.easeInOutSine, segmentId) * Math.PI * 2 :
+                0;
+            const translatedBox = translateBox(baseBox, xOffset);
+            const normalizedYOffset = (yOffset + yMoveOffset) / tex.height;
+
+            const span = yscl2 - yscl1;
+            const halfSpan = span * 0.5;
+            const targetCenter = (yscl1 + yscl2) * 0.5 + normalizedYOffset;
+            const newY1 = targetCenter - halfSpan;
+            const newY2 = targetCenter + halfSpan;
+
+            drawTrapezoidBand({
+                p: _p,
+                tex,
+                box: translatedBox,
+                yscl1: newY1,
+                yscl2: newY2,
+                xscl,
+                align,
+                rotationAngle,
+            });
+        });
     }
 
     private resolveParameters(
