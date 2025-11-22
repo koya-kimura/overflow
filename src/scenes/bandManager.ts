@@ -17,6 +17,29 @@ import {
 type DrawMode = "none" | "all" | "sequence" | "random" | "speedSeqence" | "highSpeedSeqence";
 // type numberValueType = "one" | "two" | "date" | "time" |"sequence" | "random" | "beat";
 
+type BandParameterSet = {
+    mode: DrawMode;
+    lineCount: number;
+    bandWidthHeightScale: { width: number; height: number };
+    topBottomWidthScaleX: { top: number; bottom: number };
+    topBotomCenterScaleX: { top: number; bottom: number };
+};
+
+type NumberParameterSet = {
+    numberActiveType: DrawMode;
+    numberValueType: string;
+    numberMoveType: string;
+    numberArrangeType: string;
+    numberMovingType: string;
+    numberRotateType: string;
+};
+
+type ResolvedParameters = {
+    band: BandParameterSet;
+    number: NumberParameterSet;
+    colorPalette: string[];
+};
+
 export class bandManager implements Scene {
     private mode: DrawMode = "all";
     private bandWidthHeightScale: { width: number, height: number } = { width: 1.0, height: 1.0 };
@@ -35,58 +58,10 @@ export class bandManager implements Scene {
     private colorPalette: string[] = ColorPalette.colors;
 
     update(_p: p5, beat: number, bandParamValues: number[], NumberParamValues: number[], colorPalette: string[]): void {
-        const zigzag = Math.abs(beat % 2 - 1.0);
-        const noiseVal = GVM.leapNoise(beat, 1, 1, Easing.easeInOutQuad);
-        const easeZigzag1 = Easing.easeInOutQuad(zigzag);
-        const easeZigzag2 = Easing.easeInOutQuint(zigzag);
-
-        // パラメータマッピング
-        const bandWidthHeightScaleOptions = [
-            { width: 0.3, height: 0.3 *  _p.width / _p.height },
-            { width: 0.1, height: 1.0 },
-            { width: 0.5, height: 1.0 },
-            { width: 1.0, height: 0.5 },
-            { width: 0.5, height: 0.5 },
-            { width: 1.0, height: 1.0 },
-            { width: easeZigzag1, height: 0.5 + _p.map(easeZigzag2, 0, 1, -0.05, 0.05) },
-        ];
-        const countOptions = [1.0, 2.0, 4.0, 8.0, 16.0];
-        const modeOptions: DrawMode[] = ["none", "all", "sequence", "random", "speedSeqence", "highSpeedSeqence"];
-        const topBottomWidthOptions = [
-            { top: 1.0, bottom: 1.0 },
-            { top: 0.5, bottom: 1.0 },
-            { top: 0.2, bottom: 1.0 },
-            { top: 0.1, bottom: 0.1 },
-            { top: easeZigzag1, bottom: 1.0 },
-            { top: easeZigzag1, bottom: easeZigzag2 },
-            { top: easeZigzag1, bottom: Math.abs(1.0 - easeZigzag1) },
-        ];
-        const centerOptions = [
-            { top: 0.5, bottom: 0.5 },
-            { top: easeZigzag1, bottom:  easeZigzag2},
-            { top: easeZigzag1, bottom: 0.5 },
-            { top: 0.5, bottom: noiseVal },
-        ];
-        const numberValueTypeOptions = ["one", "two", "date", "time", "sequence", "random", "beat"]
-        const numberMoveTypeOptions = ["none", "down", "wave", "sequence"]
-        const numberArrangeTypeOptions = ["simple", "center", "horizontal", "vertical", "grid", "circle", "random"];
-        const numberMovingTypeOptions = ["none", "zigzag", "ramp", "period"];
-        const numberRotateTypeOptions = ["none", "lap", "shake", "period"];
-
-        this.mode = modeOptions[bandParamValues[0]] ?? "none";
-        this.lineCount = countOptions[bandParamValues[1]] ?? 1.0;
-        this.bandWidthHeightScale = bandWidthHeightScaleOptions[bandParamValues[2]] ?? { width: 1.0, height: 1.0 };
-        this.topBottomWidthScaleX = topBottomWidthOptions[bandParamValues[3]] ?? { top: 1.0, bottom: 1.0 };
-        this.topBotomCenterScaleX = centerOptions[bandParamValues[4]] ?? { top: 0.5, bottom: 0.5 };
-
-        this.numberActiveType = modeOptions[NumberParamValues[0]] ?? "none";
-        this.numberValueType = numberValueTypeOptions[NumberParamValues[1]] ?? "one";
-        this.numberMoveType = numberMoveTypeOptions[NumberParamValues[2]] ?? "none";
-        this.numberArrangeType = numberArrangeTypeOptions[NumberParamValues[3]] ?? "simple";
-        this.numberMovingType = numberMovingTypeOptions[NumberParamValues[4]] ?? "none";
-        this.numberRotateType = numberRotateTypeOptions[NumberParamValues[5]] ?? "none";
-
-        this.colorPalette = colorPalette;
+        const resolved = this.resolveParameters(_p, beat, bandParamValues, NumberParamValues, colorPalette);
+        this.applyBandParameters(resolved.band);
+        this.applyNumberParameters(resolved.number);
+        this.colorPalette = resolved.colorPalette;
     }
 
     draw(_p: p5, tex: p5.Graphics, beat: number): void {
@@ -237,4 +212,88 @@ export class bandManager implements Scene {
         }
     }
 
+    private resolveParameters(
+        _p: p5,
+        beat: number,
+        bandParamValues: number[],
+        numberParamValues: number[],
+        colorPalette: string[],
+    ): ResolvedParameters {
+        const zigzag = Math.abs(beat % 2 - 1.0);
+        const noiseVal = GVM.leapNoise(beat, 1, 1, Easing.easeInOutQuad);
+        const easeZigzag1 = Easing.easeInOutQuad(zigzag);
+        const easeZigzag2 = Easing.easeInOutQuint(zigzag);
+
+        const bandWidthHeightScaleOptions = [
+            { width: 0.3, height: 0.3 * _p.width / _p.height },
+            { width: 0.1, height: 1.0 },
+            { width: 0.5, height: 1.0 },
+            { width: 1.0, height: 0.5 },
+            { width: 0.5, height: 0.5 },
+            { width: 1.0, height: 1.0 },
+            { width: easeZigzag1, height: 0.5 + _p.map(easeZigzag2, 0, 1, -0.05, 0.05) },
+        ];
+        const countOptions = [1.0, 2.0, 4.0, 8.0, 16.0];
+        const modeOptions: DrawMode[] = ["none", "all", "sequence", "random", "speedSeqence", "highSpeedSeqence"];
+        const topBottomWidthOptions = [
+            { top: 1.0, bottom: 1.0 },
+            { top: 0.5, bottom: 1.0 },
+            { top: 0.2, bottom: 1.0 },
+            { top: 0.1, bottom: 0.1 },
+            { top: easeZigzag1, bottom: 1.0 },
+            { top: easeZigzag1, bottom: easeZigzag2 },
+            { top: easeZigzag1, bottom: Math.abs(1.0 - easeZigzag1) },
+        ];
+        const centerOptions = [
+            { top: 0.5, bottom: 0.5 },
+            { top: easeZigzag1, bottom: easeZigzag2 },
+            { top: easeZigzag1, bottom: 0.5 },
+            { top: 0.5, bottom: noiseVal },
+        ];
+        const numberValueTypeOptions = ["one", "two", "date", "time", "sequence", "random", "beat"];
+        const numberMoveTypeOptions = ["none", "down", "wave", "sequence"];
+        const numberArrangeTypeOptions = ["simple", "center", "horizontal", "vertical", "grid", "circle", "random"];
+        const numberMovingTypeOptions = ["none", "zigzag", "ramp", "period"];
+        const numberRotateTypeOptions = ["none", "lap", "shake", "period"];
+
+        const bandParameters: BandParameterSet = {
+            mode: modeOptions[bandParamValues[0]] ?? "none",
+            lineCount: countOptions[bandParamValues[1]] ?? 1.0,
+            bandWidthHeightScale: bandWidthHeightScaleOptions[bandParamValues[2]] ?? { width: 1.0, height: 1.0 },
+            topBottomWidthScaleX: topBottomWidthOptions[bandParamValues[3]] ?? { top: 1.0, bottom: 1.0 },
+            topBotomCenterScaleX: centerOptions[bandParamValues[4]] ?? { top: 0.5, bottom: 0.5 },
+        };
+
+        const numberParameters: NumberParameterSet = {
+            numberActiveType: modeOptions[numberParamValues[0]] ?? "none",
+            numberValueType: numberValueTypeOptions[numberParamValues[1]] ?? "one",
+            numberMoveType: numberMoveTypeOptions[numberParamValues[2]] ?? "none",
+            numberArrangeType: numberArrangeTypeOptions[numberParamValues[3]] ?? "simple",
+            numberMovingType: numberMovingTypeOptions[numberParamValues[4]] ?? "none",
+            numberRotateType: numberRotateTypeOptions[numberParamValues[5]] ?? "none",
+        };
+
+        return {
+            band: bandParameters,
+            number: numberParameters,
+            colorPalette,
+        };
+    }
+
+    private applyBandParameters(band: BandParameterSet): void {
+        this.mode = band.mode;
+        this.lineCount = band.lineCount;
+        this.bandWidthHeightScale = band.bandWidthHeightScale;
+        this.topBottomWidthScaleX = band.topBottomWidthScaleX;
+        this.topBotomCenterScaleX = band.topBotomCenterScaleX;
+    }
+
+    private applyNumberParameters(number: NumberParameterSet): void {
+        this.numberActiveType = number.numberActiveType;
+        this.numberValueType = number.numberValueType;
+        this.numberMoveType = number.numberMoveType;
+        this.numberArrangeType = number.numberArrangeType;
+        this.numberMovingType = number.numberMovingType;
+        this.numberRotateType = number.numberRotateType;
+    }
 }

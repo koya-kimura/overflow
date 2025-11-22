@@ -220,13 +220,15 @@ export class APCMiniMK2Manager extends MIDIManager {
      * メインループからの更新処理。ランダム値の更新とLED出力を実行する。
      */
     public update(tempoIndex: number = 0): void {
-        const currentScene = this.gridRadioState[this.currentSceneIndex];
-        currentScene.forEach((param, colIndex) => {
-            if (param.isRandom) {
-                // ランダム値をBPMに同期して更新
-                param.randomValue = Math.floor(this.simplePseudoRandom(tempoIndex + colIndex) * param.maxOptions);
-            }
-        });
+        for(let i = 0; i < 8; i++) {
+            const currentScene = this.gridRadioState[i];
+            currentScene.forEach((param, colIndex) => {
+                if (param.isRandom) {
+                    // ランダム値をBPMに同期して更新
+                    param.randomValue = Math.floor(this.simplePseudoRandom(tempoIndex + colIndex) * param.maxOptions);
+                }
+            });
+        }
 
         this.processRandomFaders(this.getTimestamp());
 
