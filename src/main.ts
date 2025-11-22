@@ -53,8 +53,19 @@ const sketch = (p: p5) => {
     texManager.update(p);
     texManager.draw(p);
 
-    uiManager.update(p, texManager.getParamsRow(7), texManager.getBPM());
-    uiManager.draw(p, font);
+    uiManager.update(p, texManager.getParamsRow(7));
+    const paramsRows = Array.from({ length: 8 }, (_, idx) => texManager.getParamsRow(idx));
+    uiManager.draw(p, font, {
+      texManager,
+      bandManager: texManager.getBandManager(),
+      effectManager,
+      captureTexture,
+      bpm: texManager.getBPM(),
+      beat: texManager.getBeat(),
+      paramsRows,
+      colorPalette: texManager.getColorPalette(),
+      colorPaletteRGB: texManager.getColorPaletteRGB(),
+    });
 
     effectManager.apply(p, texManager.getTexture(), uiManager.getTexture(), captureTexture, texManager.sceneMatrix.faderValues, texManager.getParamsRow(6), texManager.getBeat(), texManager.getColorPaletteRGB());
   };

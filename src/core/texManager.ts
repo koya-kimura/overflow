@@ -77,6 +77,10 @@ export class TexManager {
         // this.sceneMatrix.drawDebug(p, texture, 24, 24);
     }
 
+    getBandManager(): bandManager {
+        return this.bandManager;
+    }
+
     getColorPalette(): string[] {
         const colorPaletteBooleanArray = this.sceneMatrix.getParamValues(2).map(value => value == 0);
         return ColorPalette.getColorArray(colorPaletteBooleanArray);

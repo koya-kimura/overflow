@@ -1,7 +1,5 @@
 // EffectManager はポストエフェクト用のシェーダーを読み込み適用する責務を持つ。
 import p5 from "p5";
-import { ColorPalette } from "../utils/colorPalette";
-
 export class EffectManager {
     private shader: p5.Shader | null;
 
@@ -35,10 +33,12 @@ export class EffectManager {
         this.shader.setUniform("u_resolution", [p.width, p.height]);
         this.shader.setUniform("u_time", p.millis() / 1000.0);
         this.shader.setUniform("u_colorPalette", colorPaletteRGBArray);
+        this.shader.setUniform("u_colorPaletteLength", Math.floor(colorPaletteRGBArray.length / 3));
 
         this.shader.setUniform("u_mosaic", faderValues[0]);
         this.shader.setUniform("u_wave", faderValues[1]);
         this.shader.setUniform("u_invert", faderValues[2]);
+        this.shader.setUniform("u_jitter", faderValues[3]);
 
         this.shader.setUniform("u_mainOpacity", faderValues[4]);
         this.shader.setUniform("u_bgOpacity", faderValues[5]);

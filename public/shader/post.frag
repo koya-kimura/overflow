@@ -10,9 +10,11 @@ uniform sampler2D u_uiTex;
 uniform sampler2D u_captureTex;
 
 uniform float u_colorPalette[8 * 3];
+uniform float u_colorPaletteLength;
 uniform float u_mosaic;
 uniform float u_wave;
 uniform float u_invert;
+uniform float u_jitter;
 
 uniform float u_mainOpacity;
 uniform float u_bgOpacity;
@@ -103,6 +105,11 @@ vec4 sampleTextureSafe(sampler2D tex, vec2 uv) {
 void main(void) {
     vec2 uv = vTexCoord;
 
+    if(u_jitter > 0.0) {
+        uv -= vec2(.5, .5);
+        uv *= pow(zigzag(u_beat / 2.), 2.0) * 0.5 * u_jitter + 0.5;
+        uv += vec2(.5, .5);
+    }
     if(u_mosaic > 0.0)
         uv = mosaic(uv, u_resolution, map(u_mosaic, 0., 1., 1000., 10.));
     if(u_wave > 0.0)
@@ -145,7 +152,7 @@ void main(void) {
 
     float lineNum = 20.0;
     float lineWeight = map(pow(zigzag(u_beat / 2.), 2.), 0., 1., 0.01, 0.3);
-    int index = (abs(fract(bguv.y * lineNum) - .5) < lineWeight) ? int((random(vec2(floor(bguv.y * lineNum), floor(u_beat * 4.))) - 0.01) * 8.0) : -1;
+    int index = (abs(fract(bguv.y * lineNum) - .5) < lineWeight) ? int((random(vec2(floor(bguv.y * lineNum), floor(u_beat * 4.))) - 0.01) * u_colorPaletteLength) : -1;
     bgcol = vec4(index2Color(index), 1.0);
 
     if(u_bgSceneIndex == 1) {
