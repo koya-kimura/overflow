@@ -121,26 +121,28 @@
 - 既存実装は `MIDIManager` が初期化と send ヘルパーを提供し、`APCMiniMK2Manager` が 600 行超の状態管理・入出力処理を単一クラスで担当している。
 - 入力処理: `handleMIDIMessage` に SHIFT トグル、フェーダーボタン、サイドボタン、グリッド、CC の分岐が集中。命名は概ね CamelCase だが、行列インデックスなどで追加説明コメントが必要。
 - 出力処理: `midiOutputSendControls` でサイドボタン/グリッド/フェーダーボタンの LED を一括制御。定数やカラー定義は同一ファイルに混在。
-- 補助ロジック: キーボードフォールバック、ランダムフェーダー、クランプ/乱数/時間取得など汎用ヘルパーが同ファイルに内包されており、テスト性が低い。
+- 補助ロジック: ランダムフェーダーやクランプ/乱数/時間取得など汎用ヘルパーが同ファイルに内包されており、テスト性が低い。
 - **次アクション案**
 	1. MIDI 入力・LED 出力・ランダムフェーダー・フォールバックを責務単位で分割する構造案を作成し、既存メソッド呼び出し順序を時系列で整理。
 	2. `clamp01`/`clampGridSelection`/`simplePseudoRandom` などを `src/midi/utils.ts`（仮）に抽出し、ユニットテスト導入を見据えてフェーダー関連ロジックから切り離す。
 	3. `handleMIDIMessage` を入力種別ごとの小メソッドへ分割し、命名規約に沿った引数名へ統一（例: `statusByte`, `noteNumber`, `velocity`).
 	4. `midiOutputSendControls` の LED 更新をセクション別ヘルパーへ分け、カラー定数群を `const` オブジェクトとして util 化。
-	5. キーボードフォールバックを専用クラスへ抽出し、MIDI 未接続時の初期化/解放を明示的に管理。
+	5. （更新）キーボードフォールバック機能は未使用のため段階的に廃止する方針。
 - 上記方針に沿って段階的に改修し、各ステップ後に `npm run build` と手動動作確認を実施予定。
 
 #### 実施記録 2025-11-22
 
 - `src/midi/utils.ts` を新設し、`clampGridSelection` / `clampUnitRange` / `pseudoRandomFromSeed` / `randomDurationInRange` / `getCurrentTimestamp` を共通化。
 - `APCMiniMK2Manager` から上記ヘルパーを削除・移譲し、`NumericRange` 型でフェーダー乱数の範囲を明示。
-- `update`・フォールバック処理・ランダムフェーダー更新で util を利用するよう書き換え、`processRandomFaders` での時刻取得も共通化。
+- `update` とランダムフェーダー更新を util/コントローラー経由に統一し、タイミング計算を共通化。
 - `handleMIDIMessage` を `handleShiftToggle` / `handleFaderButton` / `handleSideButton` / `handleGridPad` / `handleFaderControlChange` の分岐メソッドへ再構成し、可読性と今後の責務分離を容易にした。
 - `midiOutputSendControls` を `sendSceneButtonLeds` / `sendGridPadLeds` / `sendFaderButtonLeds` へ分割し、LED カラー定義を `LED_COLORS` へ整理して視認性と保守性を向上。
 - LED 送信処理を `sendNoteOn` ヘルパーへ集約し、LED 制御セクションの重複を削減。
 - `update` からランダム値更新ループを `updateRandomGridValues` に抽出し、キーボードフォールバック通知も専用メソッドで一元化して処理フローを短縮。
 - 未使用だったシーンランダム切替（Shift/F9/ランダムキー）処理を削除し、関連定数やメソッドを整理してコードをスリム化。
-- `setMaxOptionsForScene` で 0 を許容し、該当カラムの LED・入力・ランダム状態を OFF に保つよう調整。MIDI 入力・フォールバックとも maxOptions=0 の列では操作が効果を持たないよう統一。
+- `setMaxOptionsForScene` で 0 を許容し、該当カラムの LED・入力・ランダム状態を OFF に保つよう調整。maxOptions=0 の列では操作が効果を持たないよう統一。
+- ランダムフェーダー制御を `RandomFaderController` に分離し、値更新/モード切替/処理ループを集約。APCMini 側ではコントローラー経由で値を再計算することでメソッドと状態配列を削減。
+- 未使用のキーボードフォールバック全処理（定数・イベント登録・案内ログ・入力ハンドラ）を削除し、MIDI デバイス依存の実装に一本化。
 
 ### UIManager 型整備（2025-11-22）
 

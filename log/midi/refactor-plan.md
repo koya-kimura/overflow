@@ -6,7 +6,7 @@
   - requestMIDIAccess の初期化、MIDI port の取得、送受信 callback セットを担当する基底クラス。
   - エラーハンドリングは console 出力と availability フラグのみ。
 - `APCMiniMK2Manager`
-  - 600 行超で入力・LED 出力・フォールバック・乱数制御まで一手に内包。
+   - 600 行超で入力・LED 出力・乱数制御まで一手に内包。
   - 定数（ノートレンジ、LED 色、キー割当など）がファイル先頭に固まっているが、機能別分類が無い。
   - `update` → `processRandomFaders` → `midiOutputSendControls` が毎フレーム呼ばれる。
 
@@ -22,7 +22,7 @@
    - `activateRandomFader` 等が内部 state を直接操作し、副作用が複数箇所で発生。
    - 乱数処理や時間取得が manager 内に散在。
 4. キーボードフォールバック
-   - オン/オフ判定・キー割当処理が `handleFallbackKeyDown` 1 メソッドに集約され、 SRP 違反。
+   - 未使用だったためコードから削除済み（今後の課題対象外）。
 5. テスト難
    - util 化されていない関数 (clamp, random, timestamp) が多数。
 
@@ -52,14 +52,13 @@
 #### メモ（2025-11-22 更新）
 - maxOptions=0 を許容し、該当列の MIDI 入力・LED 表示をすべて OFF にするガードを追加済み。ランダムシーンモード関連の未使用処理は削除済み。
 
-### フェーズ 4: ランダムフェーダー
-- `FaderRandomState` 管理を専用クラス（例: `RandomFaderController`）へ切り出し。
-- `processRandomFaders` のロジックを util 化し、テスト容易性を向上。
+### フェーズ 4: ランダムフェーダー（完了）
+- `FaderRandomState` 管理を `RandomFaderController` に切り出し、値更新とモード切替を集約。（完了）
+- `processRandomFaders` のロジックを controller 側へ移し、APCMini 側は委譲のみに整理。（完了）
 
-### フェーズ 5: フォールバック入力
-- キーボードフォールバックを `KeyboardFallbackController` に抽出。
-- `APCMiniMK2Manager` は controller のコールバック登録のみ担当。
+### フェーズ 5: フォールバック入力（対応不要）
+- キーボードフォールバック機能は未使用のためコードベースから削除済み。追加対応は不要。
 
 ### フェーズ 6: テストとドキュメント
 - util への単体テスト導入を検討（Jest or Vitest）。
-- README に MIDI 操作とフォールバック手順を追記予定。
+- README に MIDI 操作を整理予定（フォールバック手順は削除）。

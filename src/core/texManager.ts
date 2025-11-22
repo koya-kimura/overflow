@@ -17,7 +17,6 @@ export class TexManager {
         this.renderTexture = null;
         this.bpmManager = new BPMManager();
         this.bandManager = new BandManager();
-        // this.midiFallback = new APCMiniMK2ToggleMatrix();
         this.sceneMatrix = new APCMiniMK2Manager();
     }
 
@@ -57,7 +56,6 @@ export class TexManager {
     update(_p: p5): void {
         this.bpmManager.update()
         this.sceneMatrix.update(Math.floor(this.bpmManager.getBeat()))
-        // this.midiFallback.update();
     }
 
     // draw はシーン描画と MIDI デバッグオーバーレイを Graphics 上にまとめて描画する。

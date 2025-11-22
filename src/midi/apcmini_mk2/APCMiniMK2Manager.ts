@@ -3,12 +3,12 @@
 import { MIDIManager } from "../midiManager";
 import {
     clampGridSelection,
-    clampUnitRange,
     getCurrentTimestamp,
     pseudoRandomFromSeed,
-    randomDurationInRange,
     type NumericRange,
 } from "../utils";
+import { RandomFaderController, type FaderButtonMode } from "./RandomFaderController";
+export type { FaderButtonMode } from "./RandomFaderController";
 
 // --- 定数定義: MIDIステータスとノートレンジ ---
 const MIDI_STATUS = {
@@ -34,6 +34,9 @@ const NOTE_RANGES = {
 const GRID_ROWS = 8;
 const GRID_COLS = 8;
 
+const RANDOM_LOW_DURATION_RANGE: NumericRange = { min: 1200, max: 4000 };
+const RANDOM_HIGH_DURATION_RANGE: NumericRange = { min: 80, max: 220 };
+
 // LEDのベロシティ (色) 定義
 const LED_COLORS = {
     OFF: 0,
@@ -42,15 +45,6 @@ const LED_COLORS = {
     // GREEN はデバイス上は紫に見えていたが、ランダムONは専用の色に変更
     BRIGHT_WHITE: 127, // シーン選択中/トグルON
 };
-
-export type FaderButtonMode = "mute" | "random";
-
-interface FaderRandomState {
-    isActive: boolean;
-    currentValue: number;
-    nextSwitchTime: number;
-    isHighPhase: boolean;
-}
 
 // サイドボタン（シーン）ごとのアクティブ色マップ (index: scene 0..7)
 const SIDE_ACTIVE_COLORS = [
@@ -69,15 +63,6 @@ const RANDOM_ON_COLOR = 45; // 紫
 
 // デフォルトのアクティブ色（フォールバック）
 const DEFAULT_ACTIVE_COLOR = 41;
-
-const KEYBOARD_FADER_KEYS = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o'] as const;
-const KEYBOARD_GRID_KEYS = ['z', 'x', 'c', 'v', 'b', 'n', 'm', ','] as const;
-const KEYBOARD_SCENE_FUNCTION_KEYS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'] as const;
-const KEYBOARD_SCENE_SELECT_KEYS = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'] as const;
-const KEYBOARD_SCENE_PREV_KEY = '[';
-const KEYBOARD_SCENE_NEXT_KEY = ']';
-const FALLBACK_FADER_STEP = 0.05;
-const FALLBACK_FINE_MODIFIER = 0.01;
 
 
 /**
@@ -102,12 +87,7 @@ export class APCMiniMK2Manager extends MIDIManager {
 
     public currentSceneIndex: number; // 現在選択されているシーンのインデックス (0-7)
     private faderButtonMode: FaderButtonMode;
-    private faderRandomStates: FaderRandomState[];
-    private readonly randomLowDurationRange: NumericRange = { min: 1200, max: 4000 };
-    private readonly randomHighDurationRange: NumericRange = { min: 80, max: 220 };
-    private keyboardFallbackActive: boolean = false;
-    private keyboardFallbackNoticeShown: boolean = false;
-    private readonly handleKeyDownRef: (event: KeyboardEvent) => void;
+    private readonly randomFaderController: RandomFaderController;
 
     /** グリッドパッドの全状態を保持 [sceneIndex][columnIndex] */
     public gridRadioState: GridParameterState[][];
@@ -120,12 +100,7 @@ export class APCMiniMK2Manager extends MIDIManager {
         this.sideButtonToggleState = new Array(8).fill(0);
         this.currentSceneIndex = 0;
         this.faderButtonMode = "random";
-        this.faderRandomStates = new Array(9).fill(0).map(() => ({
-            isActive: false,
-            currentValue: 0,
-            nextSwitchTime: 0,
-            isHighPhase: false,
-        }));
+        this.randomFaderController = new RandomFaderController(9, RANDOM_LOW_DURATION_RANGE, RANDOM_HIGH_DURATION_RANGE);
 
         // 8シーン x 8カラムの状態を初期化
         this.gridRadioState = Array(GRID_COLS).fill(0).map(() =>
@@ -139,15 +114,6 @@ export class APCMiniMK2Manager extends MIDIManager {
 
         this.sideButtonToggleState[this.currentSceneIndex] = 1;
         this.onMidiMessageCallback = this.handleMIDIMessage.bind(this);
-        this.handleKeyDownRef = this.handleFallbackKeyDown.bind(this);
-    }
-
-    protected onMidiAvailabilityChanged(available: boolean): void {
-        if (!available) {
-            this.enableKeyboardFallback();
-        } else {
-            this.disableKeyboardFallback();
-        }
     }
 
     public selectScene(index: number): void {
@@ -205,7 +171,8 @@ export class APCMiniMK2Manager extends MIDIManager {
     public update(tempoIndex: number = 0): void {
         this.updateRandomGridValues(tempoIndex);
 
-        this.processRandomFaders(getCurrentTimestamp());
+        const now = getCurrentTimestamp();
+        this.randomFaderController.process(now, this.faderButtonMode, this.faderValues);
 
         this.midiOutputSendControls();
     }
@@ -231,147 +198,6 @@ export class APCMiniMK2Manager extends MIDIManager {
                 param.randomValue = Math.floor(pseudoRandomFromSeed(seed) * param.maxOptions);
             }
         }
-    }
-
-    public isKeyboardFallbackActive(): boolean {
-        return this.keyboardFallbackActive;
-    }
-
-    private enableKeyboardFallback(): void {
-        if (this.keyboardFallbackActive || typeof window === 'undefined') {
-            return;
-        }
-
-        this.keyboardFallbackActive = true;
-        window.addEventListener('keydown', this.handleKeyDownRef, { passive: false });
-
-        this.logKeyboardFallbackNotice();
-    }
-
-    private disableKeyboardFallback(): void {
-        if (!this.keyboardFallbackActive || typeof window === 'undefined') {
-            return;
-        }
-
-        window.removeEventListener('keydown', this.handleKeyDownRef);
-        this.keyboardFallbackActive = false;
-    }
-
-    private logKeyboardFallbackNotice(): void {
-        if (this.keyboardFallbackNoticeShown) {
-            return;
-        }
-
-        console.info('[APCMiniMK2Manager] MIDIデバイスが見つからなかったため、キーボードフォールバックを有効化しました。');
-        console.info('[APCMiniMK2Manager] フェーダー: Q~O (Shiftで減少 / Ctrlで微調整)。列調整: Z~,(Shiftで減少 / Optionでランダム切替)。シーン選択: A~K (左→右)、[/] で前後移動。F1~F8 も直接選択に使用できます。');
-        this.keyboardFallbackNoticeShown = true;
-    }
-
-    private handleFallbackKeyDown(event: KeyboardEvent): void {
-        if (!this.keyboardFallbackActive) {
-            return;
-        }
-
-        if (this.handleSceneSelectionFallback(event)) {
-            event.preventDefault();
-            return;
-        }
-
-        const lowerKey = event.key.toLowerCase();
-
-        if (this.handleFaderFallback(lowerKey, event)) {
-            event.preventDefault();
-            return;
-        }
-
-        if (this.handleGridFallback(lowerKey, event)) {
-            event.preventDefault();
-        }
-    }
-
-    private handleSceneSelectionFallback(event: KeyboardEvent): boolean {
-        const lowerKey = event.key.toLowerCase();
-
-        const directIndex = KEYBOARD_SCENE_SELECT_KEYS.indexOf(lowerKey as typeof KEYBOARD_SCENE_SELECT_KEYS[number]);
-        if (directIndex !== -1) {
-            this.selectScene(directIndex);
-            return true;
-        }
-
-        if (event.key === KEYBOARD_SCENE_PREV_KEY) {
-            const prevIndex = (this.currentSceneIndex - 1 + GRID_COLS) % GRID_COLS;
-            this.selectScene(prevIndex);
-            return true;
-        }
-
-        if (event.key === KEYBOARD_SCENE_NEXT_KEY) {
-            const nextIndex = (this.currentSceneIndex + 1) % GRID_COLS;
-            this.selectScene(nextIndex);
-            return true;
-        }
-
-        if (KEYBOARD_SCENE_FUNCTION_KEYS.includes(event.key as typeof KEYBOARD_SCENE_FUNCTION_KEYS[number])) {
-            const index = parseInt(event.key.replace('F', ''), 10) - 1;
-            if (!Number.isNaN(index) && index >= 0 && index < GRID_COLS) {
-                this.selectScene(index);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private handleFaderFallback(key: string, event: KeyboardEvent): boolean {
-        const index = KEYBOARD_FADER_KEYS.indexOf(key as typeof KEYBOARD_FADER_KEYS[number]);
-        if (index === -1) {
-            return false;
-        }
-
-        const direction = event.shiftKey ? -1 : 1;
-        const step = event.ctrlKey || event.metaKey ? FALLBACK_FINE_MODIFIER : FALLBACK_FADER_STEP;
-        const delta = direction * step;
-
-        this.faderButtonToggleState[index] = 0;
-        this.deactivateRandomFader(index);
-
-        const nextValue = clampUnitRange(this.faderValuesPrev[index] + delta);
-        this.faderValuesPrev[index] = nextValue;
-        this.faderValues[index] = nextValue;
-        return true;
-    }
-
-    private handleGridFallback(key: string, event: KeyboardEvent): boolean {
-        const columnIndex = KEYBOARD_GRID_KEYS.indexOf(key as typeof KEYBOARD_GRID_KEYS[number]);
-        if (columnIndex === -1) {
-            return false;
-        }
-
-        const param = this.gridRadioState[this.currentSceneIndex][columnIndex];
-
-        if (param.maxOptions === 0) {
-            param.isRandom = false;
-            param.selectedRow = 0;
-            param.randomValue = 0;
-            return true;
-        }
-
-        if (event.altKey) {
-            param.isRandom = !param.isRandom;
-            if (!param.isRandom) {
-                param.selectedRow = clampGridSelection(param.selectedRow, param.maxOptions);
-            } else {
-                param.randomValue = Math.floor(Math.random() * param.maxOptions);
-            }
-            return true;
-        }
-
-        const direction = event.shiftKey ? -1 : 1;
-        param.isRandom = false;
-        const nextRow = clampGridSelection(param.selectedRow + direction, param.maxOptions);
-        if (nextRow !== param.selectedRow) {
-            param.selectedRow = nextRow;
-        }
-        return true;
     }
 
     /**
@@ -493,20 +319,15 @@ export class APCMiniMK2Manager extends MIDIManager {
      */
     protected updateFaderValue(index: number): void {
         const now = getCurrentTimestamp();
-
-        if (this.faderButtonMode === "mute") {
-            this.deactivateRandomFader(index);
-            this.faderValues[index] = this.faderButtonToggleState[index] ? 0 : this.faderValuesPrev[index];
-            return;
-        }
-
-        if (this.faderButtonToggleState[index]) {
-            this.activateRandomFader(index, now);
-            this.faderValues[index] = this.faderRandomStates[index].currentValue;
-        } else {
-            this.deactivateRandomFader(index);
-            this.faderValues[index] = this.faderValuesPrev[index];
-        }
+        const toggleState = this.faderButtonToggleState[index];
+        const prevValue = this.faderValuesPrev[index];
+        this.faderValues[index] = this.randomFaderController.recomputeValue(
+            index,
+            this.faderButtonMode,
+            toggleState,
+            prevValue,
+            now,
+        );
     }
 
     /**
@@ -581,92 +402,17 @@ export class APCMiniMK2Manager extends MIDIManager {
 
         this.faderButtonMode = mode;
         const now = getCurrentTimestamp();
-
-        for (let i = 0; i < this.faderButtonToggleState.length; i++) {
-            if (mode === "random") {
-                if (this.faderButtonToggleState[i]) {
-                    this.activateRandomFader(i, now);
-                    this.faderValues[i] = this.faderRandomStates[i].currentValue;
-                } else {
-                    this.deactivateRandomFader(i);
-                    this.faderValues[i] = this.faderValuesPrev[i];
-                }
-            } else {
-                this.deactivateRandomFader(i);
-                this.faderValues[i] = this.faderButtonToggleState[i] ? 0 : this.faderValuesPrev[i];
-            }
-        }
+        this.randomFaderController.syncForMode(
+            mode,
+            this.faderButtonToggleState,
+            this.faderValuesPrev,
+            this.faderValues,
+            now,
+        );
     }
 
     public getFaderButtonMode(): FaderButtonMode {
         return this.faderButtonMode;
-    }
-
-    private activateRandomFader(index: number, now: number): void {
-        const state = this.faderRandomStates[index];
-        if (state.isActive) {
-            return;
-        }
-
-        state.isActive = true;
-        state.isHighPhase = false;
-        state.currentValue = 0;
-        state.nextSwitchTime = now + this.getRandomLowDuration();
-    }
-
-    private deactivateRandomFader(index: number): void {
-        const state = this.faderRandomStates[index];
-        if (!state.isActive && state.currentValue === 0) {
-            return;
-        }
-
-        state.isActive = false;
-        state.isHighPhase = false;
-        state.currentValue = 0;
-        state.nextSwitchTime = 0;
-    }
-
-    private processRandomFaders(now: number): void {
-        if (this.faderButtonMode !== "random") {
-            return;
-        }
-
-        for (let i = 0; i < this.faderRandomStates.length; i++) {
-            const state = this.faderRandomStates[i];
-            if (!state.isActive) {
-                continue;
-            }
-
-            if (state.nextSwitchTime === 0) {
-                state.nextSwitchTime = now + (state.isHighPhase ? this.getRandomHighDuration() : this.getRandomLowDuration());
-            }
-
-            if (now >= state.nextSwitchTime) {
-                if (state.isHighPhase) {
-                    state.isHighPhase = false;
-                    state.currentValue = 0;
-                    state.nextSwitchTime = now + this.getRandomLowDuration();
-                } else {
-                    state.isHighPhase = true;
-                    state.currentValue = 1;
-                    state.nextSwitchTime = now + this.getRandomHighDuration();
-                }
-            }
-
-            this.faderValues[i] = state.currentValue;
-        }
-    }
-
-    private getRandomDuration(range: NumericRange): number {
-        return randomDurationInRange(range);
-    }
-
-    private getRandomLowDuration(): number {
-        return this.getRandomDuration(this.randomLowDurationRange);
-    }
-
-    private getRandomHighDuration(): number {
-        return this.getRandomDuration(this.randomHighDurationRange);
     }
 
     /**
