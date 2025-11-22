@@ -18,6 +18,8 @@ import {
 type DrawMode = "none" | "all" | "sequence" | "random" | "speedSeqence" | "highSpeedSeqence";
 // type numberValueType = "one" | "two" | "date" | "time" |"sequence" | "random" | "beat";
 
+type Point = { x: number; y: number };
+
 type BandParameterSet = {
     mode: DrawMode;
     lineCount: number;
@@ -151,15 +153,7 @@ export class bandManager implements Scene {
 
     private drawNumberDisplay(_p: p5, tex: p5.Graphics, baseBox: BoxCoordinates, lineIndex: number, beat: number): void {
         const numberDisplay = this.numberDisplays[lineIndex];
-        const numberValue = this.numberValueType === "one" ? (Math.floor(beat) % 10) :
-            this.numberValueType === "two" ? (lineIndex % 2 === 0 ? (Math.floor(beat) % 10) : ((Math.floor(beat) + 5) % 10)) :
-            this.numberValueType === "date" ? [...DateText.getYYYYMMDD()][lineIndex % 8].charCodeAt(0) - "0".charCodeAt(0) :
-            this.numberValueType === "time" ? [...DateText.getHHMMSS()][lineIndex % 8].charCodeAt(0) - "0".charCodeAt(0) :
-            this.numberValueType === "sequence" ? ((lineIndex + Math.floor(beat)) % 10) :
-            this.numberValueType === "random" ? Math.floor(UniformRandom.rand(Math.floor(beat), lineIndex) * 10) :
-            this.numberValueType === "beat" ? [...Math.floor(beat).toString().padStart(8, "0")][lineIndex % 8].charCodeAt(0) - "0".charCodeAt(0) :
-            0;
-        numberDisplay.setNumber(numberValue);
+        numberDisplay.setNumber(this.resolveNumberValue(lineIndex, beat));
 
         if (!this.shouldDraw(this.numberActiveType, lineIndex, beat, this.lineCount)) {
             return;
@@ -168,6 +162,7 @@ export class bandManager implements Scene {
         tex.fill(255);
 
         numberDisplay.draw((segmentId, yscl1, yscl2, xscl, align) => {
+            const segmentCount = numberDisplay.getSegmentCount();
             const baseSeed = (lineIndex + 1) * 1000 + (segmentId + 1);
 
             const vertices = resolveTrapezoidVertices({
@@ -180,44 +175,21 @@ export class bandManager implements Scene {
                 align,
             });
             const segmentCenter = computePolygonCenter(vertices);
-            const targetPositionCenter = this.numberArrangeType === "simple" ? segmentCenter :
-                this.numberArrangeType === "center" ? { x: _p.width * 0.5, y: _p.height * 0.5 } :
-                this.numberArrangeType === "horizontal" ? { x: _p.width * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1), y: _p.height * 0.5 } :
-                this.numberArrangeType === "vertical" ? { x: _p.width * 0.5, y: _p.height * (segmentId + 1) / (numberDisplay.getSegmentCount() + 1) } :
-                this.numberArrangeType === "grid" ? {
-                    x: _p.width * ((segmentId % Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
-                    y: _p.height * (Math.floor(segmentId / Math.ceil(Math.sqrt(numberDisplay.getSegmentCount()))) + 1) / (Math.ceil(Math.sqrt(numberDisplay.getSegmentCount())) + 1),
-                } :
-                this.numberArrangeType === "circle" ? {
-                    x: _p.width * 0.5 + Math.cos((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.width * 0.25),
-                    y: _p.height * 0.5 + Math.sin((segmentId / numberDisplay.getSegmentCount()) * Math.PI * 2 + beat * 0.5) * (_p.height * 0.25),
-                } :
-                this.numberArrangeType === "random" ? {
-                    x: UniformRandom.rand(baseSeed, 1, Math.floor(beat * 0.5)) * _p.width,
-                    y: UniformRandom.rand(baseSeed, 2, Math.floor(beat * 0.5)) * _p.height,
-                } :
-                segmentCenter;
+            const targetPositionCenter = this.resolveTargetPositionCenter(
+                _p,
+                segmentCenter,
+                segmentId,
+                segmentCount,
+                baseSeed,
+                beat,
+            );
 
-            const moving = this.numberMovingType === "none" ? 1.0 :
-                this.numberMovingType === "zigzag" ? Math.abs((beat % 2.0) - 1.0) :
-                this.numberMovingType === "ramp" ? Easing.easeInOutQuad(_p.fract(beat)) :
-                this.numberMovingType === "period" ? GVM.leapRamp(beat, 4, 1, Easing.easeInOutQuad) :
-                1.0;
-
+            const moving = this.resolveMovingScale(_p, beat);
             const xOffset = (targetPositionCenter.x - segmentCenter.x) * moving;
             const yOffset = (targetPositionCenter.y - segmentCenter.y) * moving;
 
-            const yMoveOffset =
-                this.numberMoveType === "down" ? ((Easing.easeOutQuad((_p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (_p.height * 1.25) :
-                this.numberMoveType === "wave" ? Math.sin((beat + lineIndex) * Math.PI * 0.5) * 50 :
-                this.numberMoveType === "sequence" ? (Math.floor(beat / this.lineCount) % 2 === 0 ? -1 : 1) * (Math.floor(beat) % this.lineCount === lineIndex ? (beat % 1.0) : 0) * (_p.height * 1.25) :
-                0;
-
-            const rotationAngle = this.numberRotateType === "none" ? 0 :
-                this.numberRotateType === "lap" ? Easing.easeInOutSine(_p.fract(beat / 4)) * Math.PI * 2 :
-                this.numberRotateType === "shake" ? Easing.zigzag(beat) * Math.PI / 10 :
-                this.numberRotateType === "period" ? GVM.leapNoise(beat, 4, 1, Easing.easeInOutSine, segmentId) * Math.PI * 2 :
-                0;
+            const yMoveOffset = this.resolveNumberMoveOffset(_p, beat, lineIndex);
+            const rotationAngle = this.resolveRotationAngle(_p, beat, segmentId);
             const translatedBox = translateBox(baseBox, xOffset);
             const normalizedYOffset = (yOffset + yMoveOffset) / tex.height;
 
@@ -238,6 +210,135 @@ export class bandManager implements Scene {
                 rotationAngle,
             });
         });
+    }
+
+    private resolveNumberValue(lineIndex: number, beat: number): number {
+        switch (this.numberValueType) {
+            case "one":
+                return Math.floor(beat) % 10;
+            case "two": {
+                const base = Math.floor(beat) % 10;
+                const shifted = (Math.floor(beat) + 5) % 10;
+                return lineIndex % 2 === 0 ? base : shifted;
+            }
+            case "date":
+                return this.digitFromText(DateText.getYYYYMMDD(), lineIndex);
+            case "time":
+                return this.digitFromText(DateText.getHHMMSS(), lineIndex);
+            case "sequence":
+                return (lineIndex + Math.floor(beat)) % 10;
+            case "random":
+                return Math.floor(UniformRandom.rand(Math.floor(beat), lineIndex) * 10);
+            case "beat":
+                return this.digitFromText(Math.floor(beat).toString().padStart(8, "0"), lineIndex);
+            default:
+                return 0;
+        }
+    }
+
+    private digitFromText(text: string, index: number): number {
+        if (text.length === 0) {
+            return 0;
+        }
+        const normalizedIndex = index % text.length;
+        const safeIndex = normalizedIndex < 0 ? normalizedIndex + text.length : normalizedIndex;
+        const char = text[safeIndex];
+        const digit = Number.parseInt(char, 10);
+        return Number.isNaN(digit) ? 0 : digit;
+    }
+
+    private resolveTargetPositionCenter(
+        _p: p5,
+        segmentCenter: Point,
+        segmentId: number,
+        segmentCount: number,
+        baseSeed: number,
+        beat: number,
+    ): Point {
+        const safeSegmentCount = Math.max(segmentCount, 1);
+
+        switch (this.numberArrangeType) {
+            case "center":
+                return { x: _p.width * 0.5, y: _p.height * 0.5 };
+            case "horizontal":
+                return {
+                    x: _p.width * (segmentId + 1) / (safeSegmentCount + 1),
+                    y: _p.height * 0.5,
+                };
+            case "vertical":
+                return {
+                    x: _p.width * 0.5,
+                    y: _p.height * (segmentId + 1) / (safeSegmentCount + 1),
+                };
+            case "grid": {
+                const gridSize = Math.ceil(Math.sqrt(safeSegmentCount));
+                const column = segmentId % gridSize;
+                const row = Math.floor(segmentId / gridSize);
+                return {
+                    x: _p.width * (column + 1) / (gridSize + 1),
+                    y: _p.height * (row + 1) / (gridSize + 1),
+                };
+            }
+            case "circle": {
+                const angle = (segmentId / safeSegmentCount) * Math.PI * 2 + beat * 0.5;
+                return {
+                    x: _p.width * 0.5 + Math.cos(angle) * (_p.width * 0.25),
+                    y: _p.height * 0.5 + Math.sin(angle) * (_p.height * 0.25),
+                };
+            }
+            case "random":
+                return {
+                    x: UniformRandom.rand(baseSeed, 1, Math.floor(beat * 0.5)) * _p.width,
+                    y: UniformRandom.rand(baseSeed, 2, Math.floor(beat * 0.5)) * _p.height,
+                };
+            case "simple":
+            default:
+                return segmentCenter;
+        }
+    }
+
+    private resolveMovingScale(_p: p5, beat: number): number {
+        switch (this.numberMovingType) {
+            case "zigzag":
+                return Math.abs((beat % 2.0) - 1.0);
+            case "ramp":
+                return Easing.easeInOutQuad(_p.fract(beat));
+            case "period":
+                return GVM.leapRamp(beat, 4, 1, Easing.easeInOutQuad);
+            case "none":
+            default:
+                return 1.0;
+        }
+    }
+
+    private resolveNumberMoveOffset(_p: p5, beat: number, lineIndex: number): number {
+        switch (this.numberMoveType) {
+            case "down":
+                return ((Easing.easeOutQuad((_p.fract(beat)) % 1.0) + 0.5) % 1 - 0.5) * (_p.height * 1.25);
+            case "wave":
+                return Math.sin((beat + lineIndex) * Math.PI * 0.5) * 50;
+            case "sequence":
+                return (Math.floor(beat / this.lineCount) % 2 === 0 ? -1 : 1) *
+                    (Math.floor(beat) % this.lineCount === lineIndex ? (beat % 1.0) : 0) *
+                    (_p.height * 1.25);
+            case "none":
+            default:
+                return 0;
+        }
+    }
+
+    private resolveRotationAngle(_p: p5, beat: number, segmentId: number): number {
+        switch (this.numberRotateType) {
+            case "lap":
+                return Easing.easeInOutSine(_p.fract(beat / 4)) * Math.PI * 2;
+            case "shake":
+                return Easing.zigzag(beat) * Math.PI / 10;
+            case "period":
+                return GVM.leapNoise(beat, 4, 1, Easing.easeInOutSine, segmentId) * Math.PI * 2;
+            case "none":
+            default:
+                return 0;
+        }
     }
 
     private resolveParameters(

@@ -107,6 +107,7 @@
 - 既存のオプション配列やマッピングロジックは構造体にまとめ、描画挙動は変更せずに整理。
 - 今後の分離（ParameterResolver など）に備え、戻り値としてバンド設定・数字設定を明示的に切り分け。
 - `draw` 内の1行処理を `createSegmentBoxForLine` / `drawBandForLine` / `drawNumberDisplay` に段階抽出し、既存描画振る舞いを維持したまま責務を整理。
+- `drawNumberDisplay` の値決定・配置・移動/回転計算を `resolveNumberValue` などのヘルパー群へ整理し、1 メソッド内のネストを緩和しつつ描画結果を維持。
 
 ### UIManager 型整備（2025-11-22）
 
