@@ -33,6 +33,7 @@ const NOTE_RANGES = {
 
 const GRID_ROWS = 8;
 const GRID_COLS = 8;
+const RANDOM_ROW_INDEX = GRID_ROWS - 1;
 
 const RANDOM_LOW_DURATION_RANGE: NumericRange = { min: 1200, max: 4000 };
 const RANDOM_HIGH_DURATION_RANGE: NumericRange = { min: 80, max: 220 };
@@ -83,7 +84,6 @@ export class APCMiniMK2Manager extends MIDIManager {
     public faderValues: number[];
     private faderValuesPrev: number[];
     public faderButtonToggleState: number[];
-    public sideButtonToggleState: number[];
 
     public currentSceneIndex: number; // 現在選択されているシーンのインデックス (0-7)
     private faderButtonMode: FaderButtonMode;
@@ -97,7 +97,6 @@ export class APCMiniMK2Manager extends MIDIManager {
         this.faderValues = new Array(9).fill(0);
         this.faderValuesPrev = new Array(9).fill(1);
         this.faderButtonToggleState = new Array(9).fill(0);
-        this.sideButtonToggleState = new Array(8).fill(0);
         this.currentSceneIndex = 0;
         this.faderButtonMode = "random";
         this.randomFaderController = new RandomFaderController(9, RANDOM_LOW_DURATION_RANGE, RANDOM_HIGH_DURATION_RANGE);
@@ -112,7 +111,6 @@ export class APCMiniMK2Manager extends MIDIManager {
             }))
         );
 
-        this.sideButtonToggleState[this.currentSceneIndex] = 1;
         this.onMidiMessageCallback = this.handleMIDIMessage.bind(this);
     }
 
@@ -122,8 +120,6 @@ export class APCMiniMK2Manager extends MIDIManager {
         }
 
         this.currentSceneIndex = index;
-        this.sideButtonToggleState.fill(0);
-        this.sideButtonToggleState[index] = 1;
     }
 
     /**
@@ -131,7 +127,7 @@ export class APCMiniMK2Manager extends MIDIManager {
     */
     public getParamValues(sceneIndex: number = this.currentSceneIndex): number[] {
         const params = this.gridRadioState[sceneIndex];
-        return params.map(param => param.isRandom ? param.randomValue : param.selectedRow);
+        return params.map((param) => (param.isRandom ? param.randomValue : param.selectedRow));
     }
 
     /**
@@ -145,23 +141,27 @@ export class APCMiniMK2Manager extends MIDIManager {
 
         for (let col = 0; col < GRID_COLS; col++) {
             const param = this.gridRadioState[sceneIndex][col];
-            const clampedMax = Math.max(0, Math.min(8, optionsArray[col]));
-            param.maxOptions = clampedMax;
+            this.applyMaxOptions(param, optionsArray[col]);
+        }
+    }
 
-            if (clampedMax === 0) {
-                param.selectedRow = 0;
-                param.randomValue = 0;
-                param.isRandom = false;
-                continue;
-            }
+    private applyMaxOptions(param: GridParameterState, requestedMax: number): void {
+        const clampedMax = Math.max(0, Math.min(GRID_ROWS, requestedMax));
+        param.maxOptions = clampedMax;
 
-            if (param.selectedRow >= clampedMax) {
-                param.selectedRow = clampedMax - 1;
-            }
+        if (!this.hasSelectableOptions(param)) {
+            this.resetGridParam(param);
+            return;
+        }
 
-            if (param.randomValue >= clampedMax) {
-                param.randomValue = clampedMax - 1;
-            }
+        const maxSelectableIndex = this.getMaxSelectableIndex(param);
+
+        if (param.selectedRow > maxSelectableIndex) {
+            param.selectedRow = maxSelectableIndex;
+        }
+
+        if (param.randomValue > maxSelectableIndex) {
+            param.randomValue = maxSelectableIndex;
         }
     }
 
@@ -185,8 +185,7 @@ export class APCMiniMK2Manager extends MIDIManager {
                 const param = params[colIndex];
 
                 if (param.maxOptions === 0) {
-                    param.isRandom = false;
-                    param.randomValue = 0;
+                    this.resetGridParam(param);
                     continue;
                 }
 
@@ -277,24 +276,18 @@ export class APCMiniMK2Manager extends MIDIManager {
         const rowIndex = GRID_ROWS - 1 - Math.floor(gridIndex / GRID_COLS);
         const param = this.gridRadioState[this.currentSceneIndex][colIndex];
 
-        if (param.maxOptions === 0) {
-            param.isRandom = false;
-            param.selectedRow = 0;
-            param.randomValue = 0;
+        if (!this.hasSelectableOptions(param)) {
+            this.resetGridParam(param);
             return true;
         }
 
-        if (rowIndex === 7) {
-            param.isRandom = !param.isRandom;
-            if (!param.isRandom) {
-                param.selectedRow = clampGridSelection(param.selectedRow, param.maxOptions);
-            }
+        if (rowIndex === RANDOM_ROW_INDEX) {
+            this.toggleGridRandom(param);
             return true;
         }
 
         if (rowIndex < param.maxOptions) {
-            param.selectedRow = rowIndex;
-            param.isRandom = false;
+            this.setGridSelection(param, rowIndex);
         }
         return true;
     }
@@ -352,30 +345,11 @@ export class APCMiniMK2Manager extends MIDIManager {
 
         for (let col = 0; col < GRID_COLS; col++) {
             const param = currentScene[col];
-            const activeRows = param.maxOptions;
-            const hasOptions = activeRows > 0;
 
             for (let row = 0; row < GRID_ROWS; row++) {
                 const gridIndex = (GRID_ROWS - 1 - row) * GRID_COLS + col;
                 const note = NOTE_RANGES.GRID.START + gridIndex;
-                let velocity = LED_COLORS.OFF;
-
-                if (hasOptions) {
-                    if (row === 7) {
-                        velocity = param.isRandom ? RANDOM_ON_COLOR : LED_COLORS.RED;
-                    }
-                    else if (row < activeRows) {
-                        const currentValue = param.isRandom ? param.randomValue : param.selectedRow;
-
-                        if (row === currentValue) {
-                            const sceneColor = SIDE_ACTIVE_COLORS[this.currentSceneIndex] ?? DEFAULT_ACTIVE_COLOR;
-                            velocity = sceneColor;
-                        } else {
-                            velocity = LED_COLORS.RED;
-                        }
-                    }
-                }
-
+                const velocity = this.getGridPadVelocity(param, row, this.currentSceneIndex);
                 this.sendNoteOn(MIDI_OUTPUT_STATUS.NOTE_ON, note, velocity);
             }
         }
@@ -393,6 +367,54 @@ export class APCMiniMK2Manager extends MIDIManager {
 
     private sendNoteOn(status: number, note: number, velocity: number): void {
         this.send(status, note, velocity);
+    }
+
+    private hasSelectableOptions(param: GridParameterState): boolean {
+        return param.maxOptions > 0;
+    }
+
+    private resetGridParam(param: GridParameterState): void {
+        param.isRandom = false;
+        param.selectedRow = 0;
+        param.randomValue = 0;
+    }
+
+    private toggleGridRandom(param: GridParameterState): void {
+        param.isRandom = !param.isRandom;
+        if (!param.isRandom) {
+            param.selectedRow = clampGridSelection(param.selectedRow, this.getMaxSelectableIndex(param));
+        }
+    }
+
+    private setGridSelection(param: GridParameterState, rowIndex: number): void {
+        const safeIndex = Math.min(rowIndex, this.getMaxSelectableIndex(param));
+        param.isRandom = false;
+        param.selectedRow = safeIndex;
+    }
+
+    private getMaxSelectableIndex(param: GridParameterState): number {
+        return Math.min(param.maxOptions, RANDOM_ROW_INDEX) - 1;
+    }
+
+    private getGridPadVelocity(param: GridParameterState, row: number, sceneIndex: number): number {
+        if (!this.hasSelectableOptions(param)) {
+            return LED_COLORS.OFF;
+        }
+
+        if (row === RANDOM_ROW_INDEX) {
+            return param.isRandom ? RANDOM_ON_COLOR : LED_COLORS.RED;
+        }
+
+        if (row >= param.maxOptions) {
+            return LED_COLORS.OFF;
+        }
+
+        const currentValue = param.isRandom ? param.randomValue : param.selectedRow;
+        if (row === currentValue) {
+            return SIDE_ACTIVE_COLORS[sceneIndex] ?? DEFAULT_ACTIVE_COLOR;
+        }
+
+        return LED_COLORS.RED;
     }
 
     public setFaderButtonMode(mode: FaderButtonMode): void {
