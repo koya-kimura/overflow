@@ -50,7 +50,7 @@ export class bandManager implements Scene {
             { width: 1.0, height: 1.0 },
             { width: easeZigzag1, height: 0.5 + _p.map(easeZigzag2, 0, 1, -0.05, 0.05) },
         ];
-        const countOptions = [1.0, 2.0, 4.0, 8.0, 16.0, 24.0, 32.0];
+        const countOptions = [1.0, 2.0, 4.0, 8.0, 16.0];
         const modeOptions: DrawMode[] = ["none", "all", "sequence", "random", "speedSeqence", "highSpeedSeqence"];
         const topBottomWidthOptions = [
             { top: 1.0, bottom: 1.0 },
