@@ -21,7 +21,6 @@ uniform float u_mainOpacity;
 uniform float u_bgOpacity;
 uniform float u_captureOpacity;
 uniform float u_uiOpacity;
-uniform float u_masterOpacity;
 
 uniform int u_bgSceneIndex;
 uniform int u_bgSceneRotateType;
@@ -93,7 +92,7 @@ vec3 index2Color(int index) {
 }
 
 float zigzag(float x) {
-    return abs(fract(x * 2.0) - 1.0);
+    return abs(mod(x, 2.) - 1.0);
 }
 
 vec4 sampleTextureSafe(sampler2D tex, vec2 uv) {
@@ -104,23 +103,31 @@ vec4 sampleTextureSafe(sampler2D tex, vec2 uv) {
 }
 
 void main(void) {
-    vec2 uv = vTexCoord;
+    vec4 col = vec4(0.0);
 
+    // ==============
+
+    vec4 objcol = vec4(0.0);
+    vec2 uv = vTexCoord;
     if(u_right == 1.0) {
         uv.x = mod(uv.x + .5 * u_right, 1.);
     } 
     
     if(u_jitter > 0.0) {
         uv -= vec2(.5, .5);
-        uv *= pow(zigzag((u_beat + 1.) / 2.), 2.0) * 1. * u_jitter + 1.;
+        uv *= zigzag((u_beat) / 2.) * u_jitter + 1.;
         uv += vec2(.5, .5);
+        if(uv.x > 1.0) uv.x = 1.0;
+        if(uv.y > 1.0) uv.y = 1.0;
+        if(uv.x < 0.0) uv.x = 0.0;
+        if(uv.y < 0.0) uv.y = 0.0;
     }
     if(u_mosaic > 0.0)
         uv = mosaic(uv, u_resolution, map(u_mosaic, 0., 1., 1000., 10.));
     if(u_wave > 0.0)
-        uv.x += zigzag(u_beat / 2.) * 0.2 * sin(uv.y * 30.0 + u_beat * PI) * u_wave;
+        uv.x += zigzag(u_beat) * 0.2 * sin(uv.y * 30.0 + u_beat * PI) * u_wave;
 
-    vec4 col = vec4(texture2D(u_tex, uv).rgb, mix(0., texture2D(u_tex, uv).a, u_mainOpacity));
+    objcol = texture2D(u_tex, uv);
 
     // ==============
 
@@ -130,12 +137,9 @@ void main(void) {
     camcol = sampleTextureSafe(u_captureTex, camuv);
     camcol = vec4(floor(gray(camcol.rgb) * 2.) > .5 ? 1.0 : 0.0);
 
-    if(col.a != 0.0) {
-        col.rgb = camcol.a != 0.0 ? col.rgb : mix(col.rgb, vec3(0.0), u_captureOpacity);
-    }
-
     // ==============
 
+    vec4 bgcol = vec4(0.0, 0.0, 0.0, 1.0);
     vec2 bguv = vTexCoord;
 
     bguv -= vec2(.5, .5);
@@ -143,17 +147,11 @@ void main(void) {
         bguv.x *= .8;
         bguv *= rot(u_time * .25);
     } else if(u_bgSceneRotateType == 2) {
-        bguv *= rot(PI * .5);
-    } else if(u_bgSceneRotateType == 3) {
-        bguv *= .1;
-    } else if(u_bgSceneRotateType == 4) {
         bguv *= 3.;
         bguv *= rot((floor(vTexCoord.x * 10.) + floor(vTexCoord.y * 10. * u_resolution.y / u_resolution.x)) * PI / 2.);
     }
 
     bguv += vec2(.5, .5);
-
-    vec4 bgcol = vec4(0.0, 0.0, 0.0, 1.0); // 透明度でマスクされるので悪くないかも
 
     float lineNum = 20.0;
     float lineWeight = map(pow(zigzag(u_beat / 2.), 2.), 0., 1., 0.01, 0.3);
@@ -179,9 +177,11 @@ void main(void) {
         }
     }
 
-    if(col.a == 0.0)
-        col = mix(col, bgcol, u_bgOpacity);
-    // if(!(abs((vTexCoord - vec2(.5)).y) < areaHeight && abs((vTexCoord - vec2(.5)).x) < areaHeight * u_resolution.x / u_resolution.y)) col = bgcol;
+     // ==============
+
+     col = bgcol * u_bgOpacity;
+     if(gray(objcol.rgb) != 0.0) col = mix(col, objcol, u_mainOpacity);
+     if(gray(objcol.rgb) != 0.0 && gray(camcol.rgb) != 1.0) col = mix(col, camcol, u_captureOpacity);
 
     // ==============
 
@@ -192,12 +192,8 @@ void main(void) {
 
     // ==============
 
-    // col.rgb *= u_masterOpacity;
-
     vec4 uicol = texture2D(u_uiTex, vTexCoord);
-    uicol *= u_uiOpacity;
-    if(uicol.a != 0.0)
-        col.rgb = uicol.rgb;
+    col.rgb += uicol.rgb * u_uiOpacity;
 
     gl_FragColor = col;
 }

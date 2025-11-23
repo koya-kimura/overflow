@@ -21,10 +21,11 @@ import {
     type BoxCoordinates,
 } from "../utils/bandGeometry";
 
-type DrawMode = "none" | "all" | "sequence" | "random" | "speedSeqence" | "highSpeedSeqence";
+type DrawMode = "all" | "sequence" | "random" | "speedSeqence" | "highSpeedSeqence";
 // type numberValueType = "one" | "two" | "date" | "time" |"sequence" | "random" | "beat";
 
 type BandParameterSet = {
+    isShow: boolean;
     mode: DrawMode;
     lineCount: number;
     bandWidthHeightScale: { width: number; height: number };
@@ -33,6 +34,7 @@ type BandParameterSet = {
 };
 
 type NumberParameterSet = {
+    isShow: boolean;
     numberActiveType: DrawMode;
     numberValueType: NumberValueType;
     numberMoveType: NumberMoveType;
@@ -48,34 +50,15 @@ type ResolvedParameters = {
 };
 
 export class BandManager {
-    /**
-     * シーンごとの最大オプション数（TexManager/MIDI連携用）を定義します。
-     * 各シーン（0-7）に対して、8つのパラメータスロットがそれぞれいくつの選択肢を持つかを配列で返します。
-     * 例えば、シーン0の最初のパラメータは6つの選択肢を持ち、2番目は5つの選択肢を持つ、といった具合です。
-     * この情報はMIDIコントローラー（APCMiniMK2Manager）が、
-     * グリッドパッドの選択範囲を制限したり、LED表示を制御したりするために使用されます。
-     *
-     * @returns シーンIDをキーとし、最大オプション数の配列を値とするオブジェクト。
-     */
-    public static getParameterSchema(): { [sceneId: number]: number[] } {
-        return {
-            0: [6, 5, 7, 7, 4, 0, 0, 0],
-            1: [6, 7, 4, 7, 4, 4, 0, 0],
-            2: [2, 2, 2, 2, 2, 2, 2, 2],
-            3: [0, 0, 0, 0, 0, 0, 0, 0],
-            4: [0, 0, 0, 0, 0, 0, 0, 0],
-            5: [0, 0, 0, 0, 0, 0, 0, 0],
-            6: [3, 5, 0, 0, 0, 0, 0, 0],
-            7: [2, 0, 0, 0, 0, 0, 0, 0],
-        };
-    }
     private mode: DrawMode = "all";
     private bandWidthHeightScale: { width: number, height: number } = { width: 1.0, height: 1.0 };
     private topBotomCenterScaleX: { top: number, bottom: number } = { top: 1.0, bottom: 1.0 };
     private topBottomWidthScaleX: { top: number, bottom: number } = { top: 1.0, bottom: 1.0 };
     private lineCount: number = 1.0;
 
-    private numberActiveType: DrawMode = "none";
+    private isShowBand: boolean = false;
+    private isShowNumber: boolean = false;
+    private numberActiveType: DrawMode = "all";
     private numberDisplays: SevenSegmentDigit[] = [];
     private numberValueType: NumberValueType = "one";
     private numberMoveType: NumberMoveType = "none";
@@ -124,29 +107,33 @@ export class BandManager {
         const bottomLeftScaleX = this.topBotomCenterScaleX.bottom - this.topBottomWidthScaleX.bottom * 0.5;
         const bottomRightScaleX = this.topBotomCenterScaleX.bottom + this.topBottomWidthScaleX.bottom * 0.5;
 
-        for (let i = 0; i < this.lineCount; i++) {
-            const baseBox = this.createSegmentBoxForLine(
-                p,
-                i,
-                topLeftScaleX,
-                topRightScaleX,
-                bottomLeftScaleX,
-                bottomRightScaleX,
-            );
+        if (this.isShowBand) {
+            for (let i = 0; i < this.lineCount; i++) {
+                const baseBox = this.createSegmentBoxForLine(
+                    p,
+                    i,
+                    topLeftScaleX,
+                    topRightScaleX,
+                    bottomLeftScaleX,
+                    bottomRightScaleX,
+                );
 
-            this.drawBandForLine(p, tex, baseBox, i, beat);
+                this.drawBandForLine(p, tex, baseBox, i, beat);
+            }
         }
 
-        for (let i = 0; i < this.lineCount; i++) {
-            const baseBox = this.createSegmentBoxForLine(
-                p,
-                i,
-                topLeftScaleX,
-                topRightScaleX,
-                bottomLeftScaleX,
-                bottomRightScaleX,
-            );
-            this.drawNumberDisplay(p, tex, baseBox, i, beat, displayController);
+        if (this.isShowNumber) {
+            for (let i = 0; i < this.lineCount; i++) {
+                const baseBox = this.createSegmentBoxForLine(
+                    p,
+                    i,
+                    topLeftScaleX,
+                    topRightScaleX,
+                    bottomLeftScaleX,
+                    bottomRightScaleX,
+                );
+                this.drawNumberDisplay(p, tex, baseBox, i, beat, displayController);
+            }
         }
     }
 
@@ -189,7 +176,6 @@ export class BandManager {
             case "speedSeqence": return index === Math.floor((beat * 4) % count);
             case "highSpeedSeqence": return index === Math.floor((beat * 8) % count);
             case "random": return Math.floor(UniformRandom.rand(Math.floor(beat)) * count) === index;
-            case "none": return false;
             default: return false;
         }
     }
@@ -287,6 +273,7 @@ export class BandManager {
             return;
         }
 
+        tex.noStroke();
         tex.fill(255);
 
         numberDisplay.draw((segmentId, yscl1, yscl2, xscl, align) => {
@@ -361,27 +348,22 @@ export class BandManager {
         numberParams: number[],
         colorPalette: string[],
     ): ResolvedParameters {
-        const zigzag = Math.abs(beat % 2 - 1.0);
-        const noiseVal = GVM.leapNoise(beat, 1, 1, Easing.easeInOutQuad);
+        const zigzag = Math.abs((beat / 2) % 2 - 1.0);
+        const noiseVal = GVM.leapNoise(beat / 2, 1, 1, Easing.easeInOutQuad);
         const easeZigzag1 = Easing.easeInOutQuad(zigzag);
         const easeZigzag2 = Easing.easeInOutQuint(zigzag);
 
         const bandWidthHeightScaleOptions = [
             { width: 0.3, height: 0.3 * p.width / p.height },
-            { width: 0.1, height: 1.0 },
             { width: 0.5, height: 1.0 },
-            { width: 1.0, height: 0.5 },
-            { width: 0.5, height: 0.5 },
             { width: 1.0, height: 1.0 },
             { width: easeZigzag1, height: 0.5 + p.map(easeZigzag2, 0, 1, -0.05, 0.05) },
         ];
-        const countOptions = [1.0, 2.0, 4.0, 8.0, 16.0];
-        const modeOptions: DrawMode[] = ["none", "all", "sequence", "random", "speedSeqence", "highSpeedSeqence"];
+        const countOptions = [1.0, 2.0, 4.0, 8.0];
+        const modeOptions: DrawMode[] = ["all", "random", "sequence", "speedSeqence", "highSpeedSeqence"];
         const topBottomWidthOptions = [
             { top: 1.0, bottom: 1.0 },
             { top: 0.5, bottom: 1.0 },
-            { top: 0.2, bottom: 1.0 },
-            { top: 0.1, bottom: 0.1 },
             { top: easeZigzag1, bottom: 1.0 },
             { top: easeZigzag1, bottom: easeZigzag2 },
             { top: easeZigzag1, bottom: Math.abs(1.0 - easeZigzag1) },
@@ -392,27 +374,29 @@ export class BandManager {
             { top: easeZigzag1, bottom: 0.5 },
             { top: 0.5, bottom: noiseVal },
         ];
-        const numberValueTypeOptions: NumberValueType[] = ["one", "two", "date", "time", "sequence", "random", "beat"];
+        const numberValueTypeOptions: NumberValueType[] = ["one", "date", "time", "sequence", "random", "beat"];
         const numberMoveTypeOptions: NumberMoveType[] = ["none", "down", "wave", "sequence"];
-        const numberArrangeTypeOptions: NumberArrangeType[] = ["simple", "center", "horizontal", "vertical", "grid", "circle", "random"];
-        const numberMovingTypeOptions: NumberMovingType[] = ["none", "zigzag", "ramp", "period"];
-        const numberRotateTypeOptions: NumberRotateType[] = ["none", "lap", "shake", "period"];
+        const numberArrangeTypeOptions: NumberArrangeType[] = ["simple", "center", "random"];
+        const numberMovingTypeOptions: NumberMovingType[] = ["none", "zigzag", "ramp"];
+        const numberRotateTypeOptions: NumberRotateType[] = ["none", "lap", "period"];
 
         const bandParameters: BandParameterSet = {
-            mode: modeOptions[bandParams[0]] ?? "none",
-            lineCount: countOptions[bandParams[1]] ?? 1.0,
-            bandWidthHeightScale: bandWidthHeightScaleOptions[bandParams[2]] ?? { width: 1.0, height: 1.0 },
-            topBottomWidthScaleX: topBottomWidthOptions[bandParams[3]] ?? { top: 1.0, bottom: 1.0 },
-            topBotomCenterScaleX: centerOptions[bandParams[4]] ?? { top: 0.5, bottom: 0.5 },
+            isShow: bandParams[0] === 1,
+            mode: modeOptions[bandParams[7]] ?? "none",
+            lineCount: countOptions[bandParams[6]] ?? 1.0,
+            bandWidthHeightScale: bandWidthHeightScaleOptions[bandParams[1]] ?? { width: 1.0, height: 1.0 },
+            topBottomWidthScaleX: topBottomWidthOptions[bandParams[2]] ?? { top: 1.0, bottom: 1.0 },
+            topBotomCenterScaleX: centerOptions[bandParams[3]] ?? { top: 0.5, bottom: 0.5 },
         };
 
         const numberParameters: NumberParameterSet = {
-            numberActiveType: modeOptions[numberParams[0]] ?? "none",
-            numberValueType: numberValueTypeOptions[numberParams[1]] ?? "one",
-            numberMoveType: numberMoveTypeOptions[numberParams[2]] ?? "none",
-            numberArrangeType: numberArrangeTypeOptions[numberParams[3]] ?? "simple",
-            numberMovingType: numberMovingTypeOptions[numberParams[4]] ?? "none",
-            numberRotateType: numberRotateTypeOptions[numberParams[5]] ?? "none",
+            isShow: numberParams[0] === 1,
+            numberActiveType: bandParameters.mode ?? "none",
+            numberValueType: numberValueTypeOptions[numberParams[5]] ?? "one",
+            numberMoveType: numberMoveTypeOptions[numberParams[1]] ?? "none",
+            numberArrangeType: numberArrangeTypeOptions[numberParams[2]] ?? "simple",
+            numberMovingType: numberMovingTypeOptions[numberParams[3]] ?? "none",
+            numberRotateType: numberRotateTypeOptions[numberParams[4]] ?? "none",
         };
 
         return {
@@ -430,6 +414,7 @@ export class BandManager {
      * @param band バンドパラメータセット。
      */
     private applyBandParameters(band: BandParameterSet): void {
+        this.isShowBand = band.isShow;
         this.mode = band.mode;
         this.lineCount = band.lineCount;
         this.bandWidthHeightScale = band.bandWidthHeightScale;
@@ -445,6 +430,7 @@ export class BandManager {
      * @param number 数値パラメータセット。
      */
     private applyNumberParameters(number: NumberParameterSet): void {
+        this.isShowNumber = number.isShow;
         this.numberActiveType = number.numberActiveType;
         this.numberValueType = number.numberValueType;
         this.numberMoveType = number.numberMoveType;

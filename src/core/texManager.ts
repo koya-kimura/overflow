@@ -41,14 +41,14 @@ export class TexManager {
     init(p: p5): void {
         this.renderTexture = p.createGraphics(p.width, p.height);
 
-        this.sceneMatrix.setMaxOptionsForScene(0, [6, 5, 7, 7, 4, 0, 0, 0]);
-        this.sceneMatrix.setMaxOptionsForScene(1, [6, 7, 4, 7, 4, 4, 0, 0]);
+        this.sceneMatrix.setMaxOptionsForScene(0, [2, 3, 2, 0, 0, 0, 4, 4]);
+        this.sceneMatrix.setMaxOptionsForScene(1, [2, 4, 3, 3, 3, 6, 0, 0]);
         this.sceneMatrix.setMaxOptionsForScene(2, [2, 2, 2, 2, 2, 2, 2, 2]);
         this.sceneMatrix.setMaxOptionsForScene(3, [0, 0, 0, 0, 0, 0, 0, 0]);
         this.sceneMatrix.setMaxOptionsForScene(4, [0, 0, 0, 0, 0, 0, 0, 0]);
         this.sceneMatrix.setMaxOptionsForScene(5, [0, 0, 0, 0, 0, 0, 0, 0]);
-        this.sceneMatrix.setMaxOptionsForScene(6, [3, 5, 0, 0, 0, 0, 0, 0]);
-        this.sceneMatrix.setMaxOptionsForScene(7, [0, 0, 0, 0, 0, 0, 0, 0]);
+        this.sceneMatrix.setMaxOptionsForScene(6, [0, 0, 0, 0, 0, 0, 0, 0]);
+        this.sceneMatrix.setMaxOptionsForScene(7, [3, 3, 0, 0, 0, 0, 0, 0]);
     }
 
     /**
@@ -122,6 +122,7 @@ export class TexManager {
 
         texture.push();
         texture.clear();
+        // texture.background(0);
 
         const beat = this.bpmManager.getBeat();
         const bandParams = this.sceneMatrix.getParamValues(0);
@@ -159,7 +160,7 @@ export class TexManager {
      * @returns カラーコード（例: "#FF0000"）の文字配列。
      */
     getColorPalette(): string[] {
-        const colorPaletteBooleanArray = this.sceneMatrix.getParamValues(2).map(value => value == 0);
+        const colorPaletteBooleanArray = this.sceneMatrix.getParamValues(2).map(value => value == 1);
         return ColorPalette.getColorArray(colorPaletteBooleanArray);
     }
 
@@ -173,7 +174,7 @@ export class TexManager {
      * @returns RGB値が順に並んだ数値配列。
      */
     getColorPaletteRGB(): number[] {
-        const colorPaletteBooleanArray = this.sceneMatrix.getParamValues(2).map(value => value == 0);
+        const colorPaletteBooleanArray = this.sceneMatrix.getParamValues(2).map(value => value == 1);
         return ColorPalette.getColorRGBArray(colorPaletteBooleanArray)
     }
 

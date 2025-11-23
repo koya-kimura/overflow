@@ -69,11 +69,11 @@ const sketch = (p: p5) => {
     texManager.draw(p);
 
     // UIの更新と描画
-    uiManager.update(p, texManager.getParamsRow(7));
+    uiManager.update(p, texManager.getParamsRow(6));
     uiManager.draw(p, font, texManager.getBeat(), texManager.getBPM());
 
     // ポストエフェクトの適用と画面への描画
-    effectManager.apply(p, texManager.getTexture(), uiManager.getTexture(), captureTexture, texManager.sceneMatrix.faderValues, texManager.getParamsRow(6), texManager.getBeat(), texManager.getColorPaletteRGB());
+    effectManager.apply(p, texManager.getTexture(), uiManager.getTexture(), captureTexture, texManager.sceneMatrix.faderValues, texManager.getParamsRow(7), texManager.getBeat(), texManager.getColorPaletteRGB());
   };
 
   // windowResized はブラウザのリサイズに追従してバッファを更新する。
