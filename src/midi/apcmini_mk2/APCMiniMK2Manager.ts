@@ -48,15 +48,19 @@ const LED_COLORS = {
 };
 
 // サイドボタン（シーン）ごとのアクティブ色マップ (index: scene 0..7)
+// 3ページ目(sceneIndex === 2)では、カラーパレットの色順と対応させるため、
+// カラムインデックスに応じて以下の色が使用される：
+// カラム0: 赤, カラム1: オレンジ, カラム2: 黄色, カラム3: 緑,
+// カラム4: 青, カラム5: インディゴ(濃いピンク), カラム6: 紫(うすいピンク), カラム7: シアン(水色)
 const SIDE_ACTIVE_COLORS = [
-    5,   // scene 0 -> 赤 (ユーザ指定)
-    60,  // scene 1 -> オレンジ
-    56,  // scene 2 -> うすピンク
-    53,  // scene 3 -> 濃いピンク
-    37,  // scene 4 -> 青
-    32,  // scene 5 -> 水色
-    21,  // scene 6 -> 青緑
-    13,  // scene 7 -> 黄緑
+    5,   // カラム0 -> 赤 (#FF0000)
+    9,   // カラム1 -> オレンジ (#FFA500)
+    13,  // カラム2 -> 黄色 (#d8d813ff) - Light Green/Yellow
+    17,  // カラム3 -> 緑 (#008000)
+    41,  // カラム4 -> 青 (#0000FF)
+    53,  // カラム5 -> インディゴ/濃いピンク (#4B0082)
+    56,  // カラム6 -> 紫/うすいピンク (#800080)
+    37,  // カラム7 -> シアン/水色 (#00FFFF)
 ];
 
 // ランダム行（最下段）がONのときの色
@@ -408,7 +412,7 @@ export class APCMiniMK2Manager extends MIDIManager {
             for (let row = 0; row < GRID_ROWS; row++) {
                 const gridIndex = (GRID_ROWS - 1 - row) * GRID_COLS + col;
                 const note = NOTE_RANGES.GRID.START + gridIndex;
-                const velocity = this.getGridPadVelocity(param, row, this.currentSceneIndex);
+                const velocity = this.getGridPadVelocity(param, row, this.currentSceneIndex, col);
                 this.sendNoteOn(MIDI_OUTPUT_STATUS.NOTE_ON, note, velocity);
             }
         }
@@ -455,7 +459,7 @@ export class APCMiniMK2Manager extends MIDIManager {
         return Math.min(param.maxOptions, RANDOM_ROW_INDEX) - 1;
     }
 
-    private getGridPadVelocity(param: GridParameterState, row: number, sceneIndex: number): number {
+    private getGridPadVelocity(param: GridParameterState, row: number, sceneIndex: number, colIndex: number = 0): number {
         if (!this.hasSelectableOptions(param)) {
             return LED_COLORS.OFF;
         }
@@ -470,6 +474,11 @@ export class APCMiniMK2Manager extends MIDIManager {
 
         const currentValue = param.isRandom ? param.randomValue : param.selectedRow;
         if (row === currentValue) {
+            // 3ページ目(sceneIndex === 2)の時は、カラムインデックスに応じた色を使用
+            if (sceneIndex === 2) {
+                return SIDE_ACTIVE_COLORS[colIndex] ?? DEFAULT_ACTIVE_COLOR;
+            }
+            // それ以外のシーンでは、従来通りシーンインデックスに応じた色を使用
             return SIDE_ACTIVE_COLORS[sceneIndex] ?? DEFAULT_ACTIVE_COLOR;
         }
 
